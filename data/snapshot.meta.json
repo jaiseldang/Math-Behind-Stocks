@@ -1,0 +1,10 @@
+{
+  "description": "Monthly average prices used in the IA. S&P 500: FRED SP500 / Shiller monthly averages. Gold: World Bank Pink Sheet monthly average (US$/troy oz). Solana: average of Kraken SOLUSD weekly closes in each month.",
+  "method": "average",
+  "sources": {
+    "sp500": "https://fred.stlouisfed.org/series/SP500",
+    "gold": "https://www.worldbank.org/en/research/commodity-markets",
+    "solana": "https://api.kraken.com/0/public/OHLC?pair=SOLUSD&interval=10080"
+  },
+  "observationsPerMonth": "S&P 500: trading days in month (FRED daily closes averaged); gold: 1 (World Bank monthly figure); Solana: 4-5 Kraken weekly closes"
+}

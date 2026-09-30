@@ -31,7 +31,13 @@ describe("resampling", () => {
   it("aligns on months every series has", () => {
     const a = resampleMonthly(obs, "average");
     const b = resampleMonthly([{ date: "2024-02-10", value: 1 }, { date: "2024-03-10", value: 1 }], "average");
-    expect(alignMonths([a, b])).toEqual({ months: ["2024-02"], dropped: ["2024-01", "2024-03"] });
+    // Jan (only a) and Mar (only b) are outside the shared span: coverage, not gaps
+    expect(alignMonths([a, b])).toEqual({ months: ["2024-02"], dropped: [] });
+  });
+  it("reports a real gap inside the shared span", () => {
+    const a = resampleMonthly([{ date: "2024-01-05", value: 1 }, { date: "2024-02-05", value: 1 }, { date: "2024-03-05", value: 1 }], "average");
+    const b = resampleMonthly([{ date: "2024-01-05", value: 1 }, { date: "2024-03-05", value: 1 }], "average");
+    expect(alignMonths([a, b])).toEqual({ months: ["2024-01", "2024-03"], dropped: ["2024-02"] });
   });
   it("month arithmetic", () => {
     expect(addMonths("2023-08", 6)).toBe("2024-02");

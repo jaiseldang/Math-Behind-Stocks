@@ -41,14 +41,22 @@ export function resampleMonthly(observations: Observation[], method: Method): Mo
 
 /**
  * Keep only months that every series has, within [from, to].
- * Returns the common months and any months dropped because one series lacked them.
+ *
+ * `dropped` lists real gaps: months inside the period covered by ALL series
+ * where at least one series is missing. Months before the latest start or
+ * after the earliest end are just differences in coverage (gold's history goes
+ * back to 1833, Solana's only to 2020), so they are not reported as gaps.
  */
 export function alignMonths(series: MonthlyPoint[][], from?: string, to?: string) {
   const inRange = (m: string) => (!from || m >= from) && (!to || m <= to);
   const sets = series.map((s) => new Set(s.filter((p) => inRange(p.month)).map((p) => p.month)));
+  const months = [...sets[0]].filter((m) => sets.every((s) => s.has(m))).sort();
+  const starts = sets.map((s) => [...s].sort()[0]);
+  const ends = sets.map((s) => [...s].sort().at(-1)!);
+  const spanStart = starts.reduce((a, b) => (a > b ? a : b));
+  const spanEnd = ends.reduce((a, b) => (a < b ? a : b));
   const all = new Set(sets.flatMap((s) => [...s]));
-  const months = [...all].filter((m) => sets.every((s) => s.has(m))).sort();
-  const dropped = [...all].filter((m) => !months.includes(m)).sort();
+  const dropped = [...all].filter((m) => m >= spanStart && m <= spanEnd && !months.includes(m)).sort();
   return { months, dropped };
 }
 

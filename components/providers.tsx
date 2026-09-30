@@ -55,6 +55,7 @@ export interface DataState {
 const DataCtx = createContext<DataState | null>(null);
 
 const snapshotMonths = SNAPSHOT.map((r) => r.month);
+const SNAPSHOT_MONTHS_FIRST = snapshotMonths[0];
 const snapshotPrices = DEFAULT_ASSETS.map((a) => SNAPSHOT.map((r) => r[ASSETS[a].snapshotKey]));
 
 // ---------------- Guesses ----------------
@@ -101,7 +102,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetch(`/api/prices?assets=SPX,XAU,SOL&source=${source}&method=${method}`)
+    // Live data uses the IA's start month so results stay comparable; it runs to the last complete month.
+    fetch(`/api/prices?assets=SPX,XAU,SOL&from=${SNAPSHOT_MONTHS_FIRST}&source=${source}&method=${method}`)
       .then(async (r) => {
         const body = await r.json();
         if (!r.ok) throw new Error(body.error ?? `HTTP ${r.status}`);

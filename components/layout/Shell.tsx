@@ -1,26 +1,41 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EXTRA_PAGES, PAGES } from "@/lib/pages";
 import { useData, useSettings } from "@/components/providers";
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const closeButton = useRef<HTMLButtonElement>(null);
   useEffect(() => setOpen(false), [path]);
+  // Mobile drawer: Escape closes it; focus moves into it when opened and back to the Menu button when closed.
+  useEffect(() => {
+    if (!open) return;
+    closeButton.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      menuButton.current?.focus();
+    };
+  }, [open]);
+  useKeyboardScrollable();
 
   return (
     <>
       <a href="#main" className="skip-link">Skip to content</a>
       <div className="mobile-bar">
-        <button className="btn" aria-expanded={open} aria-controls="sidebar" onClick={() => setOpen(!open)}>
+        <button ref={menuButton} className="btn" aria-expanded={open} aria-controls="sidebar" onClick={() => setOpen(!open)}>
           ☰ Menu
         </button>
         <span className="brand">Portfolio Explorer</span>
       </div>
       <div className="shell">
         <aside className="sidebar" id="sidebar" data-open={open} aria-label="Site navigation">
+          <button ref={closeButton} className="btn close-menu" onClick={() => setOpen(false)} aria-label="Close menu">✕ Close</button>
           <div className="brand">Portfolio Explorer</div>
           <div className="brand-sub">S&amp;P 500 · Gold · Solana. The maths behind a minimum-risk portfolio.</div>
           <nav className="nav">
@@ -121,4 +136,42 @@ function PageNav({ path }: { path: string }) {
       {next ? <Link className="btn primary" href={next.href}>{next.title} →</Link> : <span />}
     </nav>
   );
+}
+
+/**
+ * Wide equations and tables scroll sideways on phones. A scrollable box must be
+ * reachable by keyboard, so give it a tab stop, but only while it actually
+ * overflows (no pointless tab stops on desktop).
+ */
+function useKeyboardScrollable() {
+  useEffect(() => {
+    const SEL = ".katex-display, .table-wrap, .chart-wrap, pre";
+    let frame = 0;
+    const update = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        document.querySelectorAll<HTMLElement>(SEL).forEach((el) => {
+          const scrolls = el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1;
+          if (scrolls && !el.hasAttribute("tabindex")) {
+            el.setAttribute("tabindex", "0");
+            el.dataset.autoTab = "1";
+            if (!el.getAttribute("role")) el.setAttribute("role", "region");
+            if (!el.getAttribute("aria-label")) el.setAttribute("aria-label", "Scrollable content");
+          } else if (!scrolls && el.dataset.autoTab) {
+            el.removeAttribute("tabindex");
+            delete el.dataset.autoTab;
+          }
+        });
+      });
+    };
+    update();
+    const mo = new MutationObserver(update);
+    mo.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("resize", update);
+    return () => {
+      mo.disconnect();
+      window.removeEventListener("resize", update);
+      cancelAnimationFrame(frame);
+    };
+  }, []);
 }

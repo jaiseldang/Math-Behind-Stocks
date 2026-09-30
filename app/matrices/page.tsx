@@ -108,7 +108,7 @@ function CellGrid({ w, S }: { w: number[]; S: number[][] }) {
   const size = off + cell * 3 + 4;
   const [hover, setHover] = useState<[number, number] | null>(null);
   return (
-    <div className="chart-wrap" style={{ overflowX: "auto" }}>
+    <div className="chart-wrap" style={{ overflowX: "auto" }} tabIndex={0} role="region" aria-label="Table of variance terms">
       <svg className="chart" width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ width: size, maxWidth: "100%" }}>
         {DEFAULT_ASSETS.map((a, i) => (
           <g key={a}>

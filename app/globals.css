@@ -123,17 +123,21 @@ code { font-size: 0.9em; background: var(--surface-2); padding: 0.1em 0.3em; bor
 }
 .nav li a:hover { background: var(--surface-2); }
 .nav li a[aria-current="page"] { background: var(--accent); color: var(--accent-ink); }
-.nav .num { width: 1.4em; text-align: right; opacity: 0.7; font-variant-numeric: tabular-nums; }
+.nav .num { width: 1.4em; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.nav li a[aria-current="page"] .num { color: inherit; }
 .nav-extra { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 .controls { display: grid; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 0.88rem; }
 .main { padding: 32px clamp(16px, 4vw, 48px) 80px; min-width: 0; }
 .content { max-width: 880px; margin: 0 auto; }
 .mobile-bar { display: none; }
+.close-menu { display: none; }
 
 @media (max-width: 900px) {
   .shell { grid-template-columns: 1fr; }
   .sidebar { position: fixed; inset: 0 30% 0 0; z-index: 50; transform: translateX(-105%); transition: transform 0.2s; height: 100vh; }
   .sidebar[data-open="true"] { transform: none; box-shadow: 0 0 0 100vw rgba(0,0,0,0.35); }
+  .sidebar:not([data-open="true"]) { visibility: hidden; }
+  .close-menu { display: inline-block; float: right; }
   .mobile-bar {
     display: flex; align-items: center; justify-content: space-between; gap: 8px;
     position: sticky; top: 0; z-index: 40; background: var(--surface);

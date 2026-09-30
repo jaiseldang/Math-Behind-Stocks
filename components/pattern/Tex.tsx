@@ -21,8 +21,8 @@ export function Eq({ children, label }: { children: string; label?: string }) {
     } catch {}
   };
   return (
-    <div className="eq" role="math" aria-label={label ?? children}>
-      <div dangerouslySetInnerHTML={{ __html: html }} />
+    <div className="eq">
+      <div role="math" aria-label={label ?? children} dangerouslySetInnerHTML={{ __html: html }} />
       <button className="btn copy-tex" onClick={copy} aria-label="Copy this equation as LaTeX">
         {copied ? "Copied" : "Copy LaTeX"}
       </button>

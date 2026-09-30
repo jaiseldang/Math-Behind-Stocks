@@ -81,7 +81,7 @@ export default function WriteUpPage() {
           <h2 style={{ margin: 0 }}>Key numbers</h2>
           <button className="btn" onClick={() => exportCsv(["Quantity", "Value"], keyNumbers, "key-numbers", data.sourceNote)}>Download CSV</button>
         </div>
-        <div className="table-wrap" style={{ maxHeight: 380, overflowY: "auto", marginTop: 8 }}>
+        <div className="table-wrap" style={{ maxHeight: 380, overflowY: "auto", marginTop: 8 }} tabIndex={0} role="region" aria-label="Key numbers table">
           <table className="data">
             <thead><tr><th>Quantity</th><th>Value</th></tr></thead>
             <tbody>{keyNumbers.map(([q, v]) => <tr key={String(q)}><td>{q}</td><td>{typeof v === "number" ? Number(v.toPrecision(6)) : v}</td></tr>)}</tbody>

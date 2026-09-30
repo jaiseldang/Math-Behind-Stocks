@@ -168,6 +168,12 @@ describe("live mode", () => {
     expect(body.months.at(-1)).toBe("2026-08");
   });
 
+  it("different start dates are coverage, not gaps (gold's history starts earlier)", async () => {
+    const { body } = await get(prices, "/prices");
+    expect(body.months[0]).toBe("2023-06");
+    expect(body.provenance.warnings.join(" ")).not.toMatch(/Months dropped/);
+  });
+
   it("close method uses last close; gold falls back to average with a warning", async () => {
     const avg = (await get(prices, "/prices?assets=SPX,XAU&from=2024-01&to=2024-06&method=average")).body;
     const close = (await get(prices, "/prices?assets=SPX,XAU&from=2024-01&to=2024-06&method=close")).body;

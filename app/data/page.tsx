@@ -267,7 +267,7 @@ function CalendarStrip({ month }: { month: string }) {
   const labelW = 190;
   const W = labelW + days.length * (cell + 2) + 40;
   return (
-    <div className="chart-wrap" style={{ overflowX: "auto" }}>
+    <div className="chart-wrap" style={{ overflowX: "auto" }} tabIndex={0} role="region" aria-label={`Observation calendar for ${monthLabel(month)}`}>
       <svg className="chart" width={W} height={rows.length * 26 + 24} viewBox={`0 0 ${W} ${rows.length * 26 + 24}`} style={{ width: W, maxWidth: "none" }} role="img" aria-label={`Calendar of ${monthLabel(month)} showing which days each series has an observation.`}>
         {days.map((d, i) => (
           <text key={i} x={labelW + i * (cell + 2) + cell / 2} y={12} textAnchor="middle" style={{ fontSize: 9, fill: d.getUTCDay() % 6 === 0 ? "var(--bad)" : undefined }}>

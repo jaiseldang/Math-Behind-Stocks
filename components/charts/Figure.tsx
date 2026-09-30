@@ -47,12 +47,12 @@ export function Figure({
           )}
         </div>
       </div>
-      <div ref={ref} role="img" aria-label={alt}>
+      <div ref={ref} role="group" aria-label={alt}>
         {children}
       </div>
       {note}
       {showTable && table && (
-        <div className="table-wrap" style={{ maxHeight: 320, overflowY: "auto", marginTop: 8 }}>
+        <div className="table-wrap" style={{ maxHeight: 320, overflowY: "auto", marginTop: 8 }} tabIndex={0} role="region" aria-label={`${title}: data table`}>
           <table className="data">
             <thead>
               <tr>{table.header.map((h) => <th key={h} scope="col">{h}</th>)}</tr>

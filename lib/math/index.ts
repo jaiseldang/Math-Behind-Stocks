@@ -7,3 +7,5 @@ export * from "./matrix";
 export * from "./markowitz";
 export * from "./sensitivity";
 export * from "./analysis";
+export * from "./search";
+export * from "./plane";

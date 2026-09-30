@@ -39,3 +39,19 @@ describe("basic statistics (hand-checkable)", () => {
     expect(steps[0].description).toBe("R1 ↔ R2");
   });
 });
+
+describe("averaging experiment (Working 1960)", async () => {
+  const { averagingExperiment } = await import("@/lib/math");
+  it("with 1 observation a month, average = close", () => {
+    const r = averagingExperiment(1, 500);
+    expect(r.ratio).toBeCloseTo(1, 10);
+  });
+  it("with 21 trading days, SD shrinks to about √(2/3) and autocorrelation ≈ 0.25", () => {
+    const r = averagingExperiment(21, 20000);
+    expect(r.ratio).toBeGreaterThan(r.theoryRatio - 0.03);
+    expect(r.ratio).toBeLessThan(r.theoryRatio + 0.03);
+    expect(r.autocorrAvg).toBeGreaterThan(0.18);
+    expect(r.autocorrAvg).toBeLessThan(0.32);
+    expect(Math.abs(r.autocorrClose)).toBeLessThan(0.05);
+  });
+});

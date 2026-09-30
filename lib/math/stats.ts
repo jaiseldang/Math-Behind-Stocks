@@ -149,3 +149,19 @@ export function sumSquaredResiduals(xs: Vector, ys: Vector, intercept: number, s
   }
   return s;
 }
+
+/**
+ * Lag-1 autocorrelation: the correlation between each value and the next,
+ *   r₁ = Σ (x_t − x̄)(x_{t+1} − x̄) / Σ (x_t − x̄)²
+ * Near 0 for independent returns; averaging prices pushes it towards 0.25.
+ */
+export function autocorrelation1(xs: Vector): number {
+  const m = mean(xs);
+  let num = 0;
+  let den = 0;
+  for (let t = 0; t < xs.length; t++) {
+    den += (xs[t] - m) ** 2;
+    if (t + 1 < xs.length) num += (xs[t] - m) * (xs[t + 1] - m);
+  }
+  return num / den;
+}

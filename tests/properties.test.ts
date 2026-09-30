@@ -156,3 +156,45 @@ describe("Markowitz properties", () => {
     );
   });
 });
+
+describe("brute-force search agrees with Lagrange", () => {
+  it("golden-section search along the constraint line finds the Lagrange optimum", async () => {
+    const { snapshotPrices } = await import("@/lib/data/snapshot");
+    const { analysePrices, goldenMin } = await import("@/lib/math");
+    const s = analysePrices(snapshotPrices(["SPX", "XAU", "SOL"]).prices);
+    const k = lagrangeConstants(s.Sigma, s.means);
+    const target = 0.02;
+    // Points on {sum w = 1, wᵀμ = target} parametrised by w₁
+    const [m1, m2, m3] = s.means;
+    const wOf = (w1: number) => {
+      const w2 = (target - m3 - w1 * (m1 - m3)) / (m2 - m3);
+      return [w1, w2, 1 - w1 - w2];
+    };
+    const w1 = goldenMin((t) => portfolioVariance(wOf(t), s.Sigma), -2, 3);
+    const lag = optimalWeights(k, target).weights;
+    wOf(w1).forEach((w, i) => expect(w).toBeCloseTo(lag[i], 6));
+  });
+});
+
+describe("the 2D picture (page 6)", () => {
+  it("at the optimum ∇f = λ₂∇g, and λ₂ matches the Lagrange formula", async () => {
+    const { snapshotPrices } = await import("@/lib/data/snapshot");
+    const m = await import("@/lib/math");
+    const s = m.analysePrices(snapshotPrices(["SPX", "XAU", "SOL"]).prices);
+    const k = m.lagrangeConstants(s.Sigma, s.means);
+    for (const target of [0.015, 0.02, 0.03]) {
+      const p = m.optimalWeights(k, target);
+      const gf = m.planeGradient(s.Sigma, p.weights[0], p.weights[1]);
+      const gg = m.constraintGradient(s.means);
+      expect(gf[0] / gg[0]).toBeCloseTo(p.lambda2, 10);
+      expect(gf[1] / gg[1]).toBeCloseTo(p.lambda2, 10);
+      expect(p.weights[1]).toBeCloseTo(m.lineW2(s.means, target, p.weights[0]), 12);
+    }
+  });
+  it("projection lands on the line", async () => {
+    const m = await import("@/lib/math");
+    const mu = [0.01, 0.02, 0.06];
+    const [a, b] = m.projectOntoLine(mu, 0.02, 0.3, 0.9);
+    expect(m.lineW2(mu, 0.02, a)).toBeCloseTo(b, 12);
+  });
+});

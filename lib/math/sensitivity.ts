@@ -2,7 +2,7 @@
  * "What-if" helpers: change one input and see how the answer moves.
  */
 import type { Matrix } from "./matrix";
-import { clone, isPositiveDefinite } from "./matrix";
+import { clone, inverse, isPositiveDefinite } from "./matrix";
 
 /**
  * Replace the correlation between assets i and j with ρ, keeping both
@@ -45,3 +45,25 @@ export function feasibleCorrelationRange(rhoA: number, rhoB: number): { lower: n
 }
 
 export { isPositiveDefinite };
+
+/**
+ * Why an asset is shorted in the minimum-variance portfolio.
+ *
+ * Let P be the minimum-variance mix of the OTHER assets, and
+ *   β = cov(R_k, R_P) / var(R_P)
+ * be how strongly asset k amplifies P's swings. Block-inverting Σ shows
+ *   (Σ⁻¹1)_k ∝ 1 − β   (with a positive factor),
+ * so asset k gets a negative weight exactly when β > 1: adding a little of it
+ * would amplify the portfolio's swings, so selling it short dampens them.
+ */
+export function betaOnOthers(Sigma: Matrix, k: number) {
+  const others = Sigma.map((_, i) => i).filter((i) => i !== k);
+  const S2 = others.map((i) => others.map((j) => Sigma[i][j]));
+  const inv2 = inverse(S2).inverse;
+  const a2 = inv2.flat().reduce((s, x) => s + x, 0); // 1ᵀΣ₂⁻¹1
+  const wP = inv2.map((row) => row.reduce((s, x) => s + x, 0) / a2); // Σ₂⁻¹1 / 1ᵀΣ₂⁻¹1
+  const varP = 1 / a2;
+  const covKP = others.reduce((s, i, idx) => s + wP[idx] * Sigma[k][i], 0);
+  return { others, weightsP: wP, varP, covKP, beta: covKP / varP };
+}
+

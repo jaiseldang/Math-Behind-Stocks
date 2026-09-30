@@ -28,6 +28,10 @@ export function standaloneSvg(svg: SVGSVGElement, title: string, caption: string
       const v = cs.getPropertyValue(p);
       if (v) target.style.setProperty(p, v);
     }
+    // Resolve CSS variables in attributes too, for editors that ignore inline styles.
+    for (const attr of ["fill", "stroke"]) {
+      if (target.getAttribute(attr)?.includes("var(")) target.setAttribute(attr, cs.getPropertyValue(attr));
+    }
   });
   const box = svg.viewBox.baseVal;
   const width = box && box.width ? box.width : svg.clientWidth;
@@ -92,7 +96,8 @@ export async function exportPng(svg: SVGSVGElement, filename: string, title: str
 
 export function toCsv(header: string[], rows: (string | number)[][], caption?: string): string {
   const cell = (v: string | number) => {
-    const s = typeof v === "number" ? String(v) : v;
+    // 12 significant figures removes floating-point noise such as 0.034999999999999996
+    const s = typeof v === "number" ? String(Number(v.toPrecision(12))) : v;
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const lines = [header.map(cell).join(","), ...rows.map((r) => r.map(cell).join(","))];

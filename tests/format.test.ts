@@ -16,3 +16,11 @@ describe("display formatting", () => {
     expect(texNum(3e-17, 4)).toBe("0");
   });
 });
+
+describe("CSV export", async () => {
+  const { toCsv } = await import("@/lib/export");
+  it("rounds float noise, quotes commas, appends the caption", () => {
+    const csv = toCsv(["a", "b"], [[0.034999999999999996, "x,y"]], "Source: test");
+    expect(csv).toBe('a,b\n0.035,"x,y"\n\nSource: test');
+  });
+});

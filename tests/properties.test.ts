@@ -198,3 +198,54 @@ describe("the 2D picture (page 6)", () => {
     expect(m.lineW2(mu, 0.02, a)).toBeCloseTo(b, 12);
   });
 });
+
+describe("why Solana is shorted (investigation 4)", () => {
+  it("sign of the minimum-variance weight equals sign of 1 − β", async () => {
+    const m = await import("@/lib/math");
+    fc.assert(
+      fc.property(spdMatrix(3), fc.integer({ min: 0, max: 2 }), (S, k) => {
+        const w = m.inverse(S).inverse.map((r) => r.reduce((a, b) => a + b, 0));
+        const { beta } = m.betaOnOthers(S, k);
+        if (Math.abs(1 - beta) < 1e-9) return;
+        expect(Math.sign(w[k])).toBe(Math.sign(1 - beta));
+      }),
+    );
+  });
+  it("in the IA data Solana's β on the S&P/gold mix is above 1", async () => {
+    const { snapshotPrices } = await import("@/lib/data/snapshot");
+    const m = await import("@/lib/math");
+    const s = m.analysePrices(snapshotPrices(["SPX", "XAU", "SOL"]).prices);
+    expect(m.betaOnOthers(s.Sigma, 2).beta).toBeGreaterThan(1);
+  });
+});
+
+describe("long-only optimum (limitations page)", () => {
+  it("equals the Lagrange answer inside the no-short band, and is never less risky outside it", async () => {
+    const { snapshotPrices } = await import("@/lib/data/snapshot");
+    const m = await import("@/lib/math");
+    const s = m.analysePrices(snapshotPrices(["SPX", "XAU", "SOL"]).prices);
+    const k = m.lagrangeConstants(s.Sigma, s.means);
+    const band = m.zeroCrossings(k).noShortInterval!;
+    for (const t of [0.0195, 0.022, 0.028]) {
+      const lo = m.longOnlyOptimum(s.Sigma, s.means, t)!;
+      m.optimalWeights(k, t).weights.forEach((w, i) => expect(lo.weights[i]).toBeCloseTo(w, 6));
+    }
+    for (const t of [0.017, 0.035, 0.05]) {
+      const lo = m.longOnlyOptimum(s.Sigma, s.means, t)!;
+      expect(lo.weights.every((w) => w >= 0)).toBe(true);
+      expect(lo.weights.some((w) => w === 0)).toBe(true); // a constraint is active (KKT)
+      expect(lo.variance).toBeGreaterThanOrEqual(m.frontierVariance(k, t) - 1e-15);
+      expect(m.sum(lo.weights)).toBeCloseTo(1, 10);
+      expect(m.dot(lo.weights, s.means)).toBeCloseTo(t, 10);
+    }
+    expect(band.lower).toBeLessThan(0.0195);
+    expect(m.longOnlyOptimum(s.Sigma, s.means, 0.1)).toBeNull(); // above every asset's mean
+  });
+  it("quantile and bootstrap are reproducible", async () => {
+    const m = await import("@/lib/math");
+    expect(m.quantile([1, 2, 3, 4, 5], 0.5)).toBe(3);
+    expect(m.quantile([0, 10], 0.25)).toBe(2.5);
+    const a = m.bootstrap(10, 5, (idx) => idx.join(","), 1);
+    expect(m.bootstrap(10, 5, (idx) => idx.join(","), 1)).toEqual(a);
+  });
+});

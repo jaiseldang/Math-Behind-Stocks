@@ -165,3 +165,14 @@ export function autocorrelation1(xs: Vector): number {
   }
   return num / den;
 }
+
+/**
+ * Downside semi-deviation: like the standard deviation, but only months below
+ * the mean count. Variance treats a +20% surprise the same as a −20% one;
+ * this measure only counts the bad surprises.
+ *   s₋ = √( Σ min(R_t − R̄, 0)² / (n − 1) )
+ */
+export function downsideDeviation(xs: Vector): number {
+  const m = mean(xs);
+  return Math.sqrt(xs.reduce((s, x) => s + Math.min(x - m, 0) ** 2, 0) / (xs.length - 1));
+}

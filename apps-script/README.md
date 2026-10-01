@@ -10,7 +10,19 @@ The three files in [`dist/`](dist/) are **generated** from the same source code 
 | [`dist/Index.html`](dist/Index.html) | The whole website in one file | ~235 KB |
 | [`dist/appsscript.json`](dist/appsscript.json) | Project settings (V8 runtime, web app access) | tiny |
 
-## Setting it up (about 5 minutes)
+## Quickest setup: paste one short file (about 2 minutes)
+
+[`loader/Code.gs`](loader/Code.gs) is about 100 lines. It downloads `Index.html` and `Code.gs` from this public GitHub repository, pinned to one tested commit so they can't change underneath you, caches them, and runs them. The site and API behave exactly as if you had pasted the big files.
+
+1. Go to **<https://script.google.com>** → **New project**, and rename it “Portfolio Explorer”.
+2. Replace everything in `Code.gs` with the contents of [`loader/Code.gs`](loader/Code.gs), then 💾 **Save**.
+3. Optional: ⚙️ **Project Settings → Script Properties → Add script property** `FRED_API_KEY` (your free key) for live S&P 500 data.
+4. Optional check: pick `testSources` in the function menu → ▶ **Run** → allow access (see step 7 below about the “unverified app” screen) → read the **Execution log**.
+5. **Deploy → New deployment → ⚙️ Web app**. Set *Execute as* to **Me** and *Who has access* to **Anyone**, click **Deploy**, and open the **Web app URL**.
+
+The repository must stay public for the loader to work. If you'd rather not depend on GitHub, use the full setup below.
+
+## Full setup: paste the three files (about 5 minutes)
 
 1. Go to **<https://script.google.com>** and click **New project**. Rename it “Portfolio Explorer”.
 2. **Code.gs**: select everything in the editor's `Code.gs`, delete it, and paste the contents of [`dist/Code.gs`](dist/Code.gs). (On GitHub, open the file, click **Raw**, then select all and copy.)

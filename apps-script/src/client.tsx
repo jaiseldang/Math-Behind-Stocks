@@ -25,6 +25,7 @@ import ReturnsPage from "@/app/returns/page";
 import RiskPage from "@/app/risk/page";
 import SolvingPage from "@/app/solving/page";
 import WriteUpPage from "@/app/write-up/page";
+import { BUILD_TARGET } from "@/lib/target";
 import { scriptRun } from "./shims/fetch-bridge";
 import { interceptLinks, scrollAfterRender, useRoute } from "./shims/router";
 
@@ -65,6 +66,17 @@ function useServiceUrl() {
 /** The API docs page, plus how to call the API on this Apps Script deployment. */
 function ApiDocsWithUrl() {
   const url = useServiceUrl() || "<your web app URL>";
+  if (BUILD_TARGET === "static") {
+    return (
+      <>
+        <div className="banner" style={{ marginTop: 0 }}>
+          <strong>Hosted version.</strong> There is no server behind this page, so the “Try it” links below run the same API code inside your browser, using the IA snapshot.
+          The full site (Next.js or Google Apps Script) serves the API over HTTP with live data.
+        </div>
+        <ApiDocs />
+      </>
+    );
+  }
   return (
     <>
       <div className="banner" style={{ marginTop: 0 }}>

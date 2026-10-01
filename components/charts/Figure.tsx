@@ -2,6 +2,7 @@
 import { useRef, useState } from "react";
 import { useData } from "@/components/providers";
 import { exportCsv, exportPng, exportSvg, slug } from "@/lib/export";
+import { DOWNLOADS_ALLOWED } from "@/lib/target";
 
 export interface TableData {
   header: string[];
@@ -37,9 +38,13 @@ export function Figure({
       <div className="figure-head">
         <div className="figure-title">{title}</div>
         <div className="export-menu" role="group" aria-label={`Export ${title}`}>
-          <button className="btn" onClick={() => svg() && exportPng(svg()!, name, title, cap)}>PNG</button>
-          <button className="btn" onClick={() => svg() && exportSvg(svg()!, name, title, cap)}>SVG</button>
-          {table && <button className="btn" onClick={() => exportCsv(table.header, table.rows, name, cap)}>CSV</button>}
+          {DOWNLOADS_ALLOWED && (
+            <>
+              <button className="btn" onClick={() => svg() && exportPng(svg()!, name, title, cap)}>PNG</button>
+              <button className="btn" onClick={() => svg() && exportSvg(svg()!, name, title, cap)}>SVG</button>
+              {table && <button className="btn" onClick={() => exportCsv(table.header, table.rows, name, cap)}>CSV</button>}
+            </>
+          )}
           {table && (
             <button className="btn" aria-pressed={showTable} onClick={() => setShowTable(!showTable)}>
               Table

@@ -95,6 +95,7 @@ body {
   font-size: 17px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  overflow-wrap: break-word; /* long URLs and file paths wrap instead of widening the page */
 }
 a { color: var(--accent); }
 h1, h2, h3, h4 { line-height: 1.25; margin: 0 0 0.5em; }
@@ -207,7 +208,8 @@ input[type="number"], input[type="text"], select {
 }
 .eq:hover .copy-tex, .eq:focus-within .copy-tex { opacity: 1; }
 @media (hover: none) { .eq .copy-tex { opacity: 0.7; } }
-.steps { display: grid; gap: 10px; }
+.steps { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.step > * { min-width: 0; }
 .step { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 16px; align-items: start; padding: 10px 0; border-bottom: 1px dashed var(--border); }
 .step:last-child { border-bottom: 0; }
 .step.stacked { grid-template-columns: 1fr; gap: 6px; }

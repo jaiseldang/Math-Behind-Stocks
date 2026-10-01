@@ -6,8 +6,21 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { useSettings } from "@/components/providers";
+import { BUILD_TARGET } from "@/lib/target";
 
-export function TradingViewMini({ symbol, title }: { symbol: string; title: string }) {
+export function TradingViewMini(props: { symbol: string; title: string }) {
+  // The hosted single-page version can't load third-party scripts: show the link only.
+  if (BUILD_TARGET === "static") {
+    return (
+      <div className="tv-box" style={{ minHeight: 0, padding: "10px 12px" }}>
+        <a href={`https://www.tradingview.com/symbols/${props.symbol.replace(":", "-")}/`} target="_blank" rel="noopener noreferrer">{props.title} on TradingView ↗</a>
+      </div>
+    );
+  }
+  return <TradingViewWidget {...props} />;
+}
+
+function TradingViewWidget({ symbol, title }: { symbol: string; title: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const { theme } = useSettings();
   const [failed, setFailed] = useState(false);

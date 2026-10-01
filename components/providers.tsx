@@ -5,7 +5,7 @@
  *  - Data: which prices the pages use (IA snapshot by default, or live from the API).
  *  - Guesses: what the reader predicted, so each Finding can compare.
  */
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ASSETS, DEFAULT_ASSETS, type AssetId } from "@/lib/assets";
 import { SNAPSHOT } from "@/lib/data/snapshot";
 import type { Method, Provenance } from "@/lib/data/types";
@@ -93,7 +93,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
     setMethodState(load("pe.method", "average"));
   }, []);
 
+  // Only touch data-theme once a theme has been chosen here, so a host page's
+  // own theme (e.g. when the site is embedded) isn't overridden on load.
+  const themeTouched = useRef(false);
   useEffect(() => {
+    if (theme !== "system") themeTouched.current = true;
+    if (!themeTouched.current) return;
     if (theme === "system") document.documentElement.removeAttribute("data-theme");
     else document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);

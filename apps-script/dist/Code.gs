@@ -40,13 +40,125 @@ var PortfolioExplorer = (() => {
     fetchText: () => fetchText,
     handleApi: () => handleApi,
     loadMonthlyPrices: () => loadMonthlyPrices,
-    parseQuery: () => parseQuery,
     readCache: () => readCache,
-    route: () => route,
+    route: () => route2,
     serviceUrl: () => serviceUrl,
     testSources: () => testSources,
     writeCache: () => writeCache
   });
+
+  // lib/api/openapi.ts
+  var common = [
+    { name: "assets", in: "query", schema: { type: "string", default: "SPX,XAU,SOL" }, description: "Comma-separated asset ids: SPX (S&P 500), XAU (gold), SOL (Solana)." },
+    { name: "from", in: "query", schema: { type: "string", pattern: "^\\d{4}-\\d{2}$", example: "2023-08" }, description: "First month (inclusive)." },
+    { name: "to", in: "query", schema: { type: "string", pattern: "^\\d{4}-\\d{2}$", example: "2026-08" }, description: "Last month (inclusive)." },
+    { name: "method", in: "query", schema: { type: "string", enum: ["average", "close"], default: "average" }, description: "average = mean of the month's closes; close = last close of the month." },
+    { name: "source", in: "query", schema: { type: "string", enum: ["live", "snapshot"], default: "live" }, description: "live = FRED/World Bank/Kraken (cached daily, falls back to snapshot); snapshot = the bundled IA data." },
+    { name: "solInterval", in: "query", schema: { type: "string", enum: ["weekly", "daily"], default: "weekly" }, description: "Kraken candle size for Solana. Daily only reaches back ~720 days." }
+  ];
+  var provenance = {
+    type: "object",
+    description: "Where every number came from.",
+    properties: {
+      source: { type: "string", enum: ["live", "snapshot"] },
+      method: { type: "string" },
+      months: { type: "object" },
+      fallback: { type: "boolean", description: "true if any asset used cached or snapshot data because the live source failed" },
+      warnings: { type: "array", items: { type: "string" } },
+      assets: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            asset: { type: "string" },
+            source: { type: "string" },
+            url: { type: "string" },
+            retrievedAt: { type: "string", format: "date-time" },
+            method: { type: "string" },
+            frequency: { type: "string" },
+            datingRule: { type: "string" },
+            observationsPerMonth: { type: "object", additionalProperties: { type: "integer" } },
+            cache: { type: "string", enum: ["hit", "miss", "stale", "none"] },
+            fallback: { type: "boolean" },
+            warnings: { type: "array", items: { type: "string" } }
+          }
+        }
+      }
+    }
+  };
+  var ok = (description) => ({
+    "200": { description, content: { "application/json": { schema: { type: "object", properties: { provenance: { $ref: "#/components/schemas/Provenance" } } } } } },
+    "400": { description: "Invalid parameters" },
+    "422": { description: "Valid parameters, but the maths has no answer (e.g. \u03A3 not positive definite)" },
+    "429": { description: "Rate limited (Retry-After header)" }
+  });
+  var openApiSpec = {
+    openapi: "3.1.0",
+    info: {
+      title: "Portfolio Explorer API",
+      version: "1.0.0",
+      description: "Real monthly data for the S&P 500, gold and Solana, and the Markowitz minimum-variance maths behind an IB Math AA HL IA. Every response carries a provenance block."
+    },
+    paths: {
+      "/api/prices": { get: { summary: "Monthly prices", parameters: common, responses: ok("Monthly prices per asset") } },
+      "/api/returns": { get: { summary: "Monthly simple returns R = P_t/P_{t\u22121} \u2212 1", parameters: common, responses: ok("Monthly returns") } },
+      "/api/stats": {
+        get: { summary: "Means, sample variances (n \u2212 1), SDs, covariance & correlation matrices, geometric means, annualised figures", parameters: common, responses: ok("Statistics") }
+      },
+      "/api/optimize": {
+        post: {
+          summary: "Minimum-variance weights for a target monthly return (Lagrange multipliers)",
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["targetReturn"],
+                  properties: {
+                    assets: { type: "string", example: "SPX,XAU,SOL" },
+                    from: { type: "string" },
+                    to: { type: "string" },
+                    method: { type: "string", enum: ["average", "close"] },
+                    source: { type: "string", enum: ["live", "snapshot"] },
+                    targetReturn: { type: "number", example: 0.02 },
+                    amount: { type: "number", example: 1e3 },
+                    includeSteps: { type: "boolean", description: "include every Gauss\u2013Jordan row operation" }
+                  }
+                }
+              }
+            }
+          },
+          responses: ok("\u03A3, \u03A3\u207B\xB9, det \u03A3, A, B, C, D, \u03BB\u2081, \u03BB\u2082, weights, dollars, variance, volatility and checks")
+        }
+      },
+      "/api/frontier": {
+        get: {
+          summary: "Efficient-frontier points, minimum-variance portfolio, asymptotes and no-short-selling range",
+          parameters: [
+            ...common,
+            { name: "from_mu", in: "query", schema: { type: "number", default: 0.01 } },
+            { name: "to_mu", in: "query", schema: { type: "number", default: 0.034 } },
+            { name: "step", in: "query", schema: { type: "number", default: 1e-3 } }
+          ],
+          responses: ok("Frontier")
+        }
+      },
+      "/api/explore/sensitivity": {
+        get: {
+          summary: "Recompute the minimum-variance portfolio after replacing one correlation (checks \u03A3 stays positive definite)",
+          parameters: [
+            ...common,
+            { name: "pair", in: "query", schema: { type: "string", default: "SPX,XAU" } },
+            { name: "rho", in: "query", schema: { type: "string", default: "-0.5,0,0.5" } }
+          ],
+          responses: ok("One result per \u03C1; invalid \u03C1 values carry an error message")
+        }
+      },
+      "/api/snapshot": { get: { summary: "The bundled IA dataset (works offline)", responses: ok("Snapshot") } },
+      "/api/docs": { get: { summary: "This OpenAPI document", responses: { "200": { description: "OpenAPI JSON" } } } }
+    },
+    components: { schemas: { Provenance: provenance } }
+  };
 
   // lib/assets.ts
   var ASSETS = {
@@ -62,6 +174,249 @@ var PortfolioExplorer = (() => {
     if (new Set(ids).size !== ids.length) throw new Error("assets must not repeat");
     return ids;
   }
+
+  // data/snapshot.json
+  var snapshot_default = [
+    {
+      month: "2023-08",
+      sp500: 4457.36,
+      gold: 1919,
+      solana: 22.57
+    },
+    {
+      month: "2023-09",
+      sp500: 4515.77,
+      gold: 1916,
+      solana: 19.3625
+    },
+    {
+      month: "2023-10",
+      sp500: 4269.4,
+      gold: 1916,
+      solana: 25.255
+    },
+    {
+      month: "2023-11",
+      sp500: 4460.06,
+      gold: 1984,
+      solana: 53.342
+    },
+    {
+      month: "2023-12",
+      sp500: 4685.05,
+      gold: 2026,
+      solana: 80.42
+    },
+    {
+      month: "2024-01",
+      sp500: 4804.49,
+      gold: 2034,
+      solana: 97.674
+    },
+    {
+      month: "2024-02",
+      sp500: 5011.96,
+      gold: 2023,
+      solana: 110.555
+    },
+    {
+      month: "2024-03",
+      sp500: 5170.57,
+      gold: 2158,
+      solana: 168.2275
+    },
+    {
+      month: "2024-04",
+      sp500: 5112.49,
+      gold: 2331,
+      solana: 159.58
+    },
+    {
+      month: "2024-05",
+      sp500: 5235.23,
+      gold: 2351,
+      solana: 156.026
+    },
+    {
+      month: "2024-06",
+      sp500: 5415.14,
+      gold: 2326,
+      solana: 150.265
+    },
+    {
+      month: "2024-07",
+      sp500: 5538,
+      gold: 2398,
+      solana: 157.566
+    },
+    {
+      month: "2024-08",
+      sp500: 5478.21,
+      gold: 2470,
+      solana: 143.775
+    },
+    {
+      month: "2024-09",
+      sp500: 5621.26,
+      gold: 2571,
+      solana: 137.12
+    },
+    {
+      month: "2024-10",
+      sp500: 5792.32,
+      gold: 2690,
+      solana: 155.794
+    },
+    {
+      month: "2024-11",
+      sp500: 5929.92,
+      gold: 2651,
+      solana: 220.04
+    },
+    {
+      month: "2024-12",
+      sp500: 6010.91,
+      gold: 2648,
+      solana: 215.2175
+    },
+    {
+      month: "2025-01",
+      sp500: 5979.52,
+      gold: 2710,
+      solana: 216.558
+    },
+    {
+      month: "2025-02",
+      sp500: 6038.69,
+      gold: 2895,
+      solana: 174.165
+    },
+    {
+      month: "2025-03",
+      sp500: 5683.98,
+      gold: 2983,
+      solana: 136.435
+    },
+    {
+      month: "2025-04",
+      sp500: 5369.5,
+      gold: 3218,
+      solana: 133.29
+    },
+    {
+      month: "2025-05",
+      sp500: 5810.92,
+      gold: 3309,
+      solana: 167.46
+    },
+    {
+      month: "2025-06",
+      sp500: 6029.95,
+      gold: 3353,
+      solana: 151.0575
+    },
+    {
+      month: "2025-07",
+      sp500: 6296.5,
+      gold: 3340,
+      solana: 170.108
+    },
+    {
+      month: "2025-08",
+      sp500: 6408.95,
+      gold: 3368,
+      solana: 190.135
+    },
+    {
+      month: "2025-09",
+      sp500: 6584.02,
+      gold: 3668,
+      solana: 222.84
+    },
+    {
+      month: "2025-10",
+      sp500: 6735.69,
+      gold: 4058.33,
+      solana: 203.868
+    },
+    {
+      month: "2025-11",
+      sp500: 6740.89,
+      gold: 4087,
+      solana: 148.92
+    },
+    {
+      month: "2025-12",
+      sp500: 6853.03,
+      gold: 4309,
+      solana: 130.224
+    },
+    {
+      month: "2026-01",
+      sp500: 6929.12,
+      gold: 4753,
+      solana: 134.3875
+    },
+    {
+      month: "2026-02",
+      sp500: 6893.81,
+      gold: 5020,
+      solana: 85.195
+    },
+    {
+      month: "2026-03",
+      sp500: 6654.42,
+      gold: 4856,
+      solana: 89.81
+    },
+    {
+      month: "2026-04",
+      sp500: 6957.01,
+      gold: 4721,
+      solana: 83.728
+    },
+    {
+      month: "2026-05",
+      sp500: 7412.55,
+      gold: 4587,
+      solana: 87.155
+    },
+    {
+      month: "2026-06",
+      sp500: 7450.03,
+      gold: 4228,
+      solana: 68.655
+    },
+    {
+      month: "2026-07",
+      sp500: 7481.34,
+      gold: 4073,
+      solana: 76.77
+    },
+    {
+      month: "2026-08",
+      sp500: 7711.32,
+      gold: 4411,
+      solana: 84.2325
+    }
+  ];
+
+  // data/snapshot.meta.json
+  var snapshot_meta_default = {
+    description: "Monthly average prices used in the IA. S&P 500: FRED SP500 / Shiller monthly averages. Gold: World Bank Pink Sheet monthly average (US$/troy oz). Solana: average of Kraken SOLUSD weekly closes in each month.",
+    method: "average",
+    sources: {
+      sp500: "https://fred.stlouisfed.org/series/SP500",
+      gold: "https://www.worldbank.org/en/research/commodity-markets",
+      solana: "https://api.kraken.com/0/public/OHLC?pair=SOLUSD&interval=10080"
+    },
+    observationsPerMonth: "S&P 500: trading days in month (FRED daily closes averaged); gold: 1 (World Bank monthly figure); Solana: 4-5 Kraken weekly closes"
+  };
+
+  // lib/data/snapshot.ts
+  var SNAPSHOT = snapshot_default;
+  var SNAPSHOT_META = snapshot_meta_default;
+  var SNAPSHOT_MONTHS = SNAPSHOT.map((r) => r.month);
 
   // lib/math/stats.ts
   function simpleReturns(prices) {
@@ -562,118 +917,70 @@ var PortfolioExplorer = (() => {
     };
   }
 
-  // lib/api/openapi.ts
-  var common = [
-    { name: "assets", in: "query", schema: { type: "string", default: "SPX,XAU,SOL" }, description: "Comma-separated asset ids: SPX (S&P 500), XAU (gold), SOL (Solana)." },
-    { name: "from", in: "query", schema: { type: "string", pattern: "^\\d{4}-\\d{2}$", example: "2023-08" }, description: "First month (inclusive)." },
-    { name: "to", in: "query", schema: { type: "string", pattern: "^\\d{4}-\\d{2}$", example: "2026-08" }, description: "Last month (inclusive)." },
-    { name: "method", in: "query", schema: { type: "string", enum: ["average", "close"], default: "average" }, description: "average = mean of the month's closes; close = last close of the month." },
-    { name: "source", in: "query", schema: { type: "string", enum: ["live", "snapshot"], default: "live" }, description: "live = FRED/World Bank/Kraken (cached daily, falls back to snapshot); snapshot = the bundled IA data." },
-    { name: "solInterval", in: "query", schema: { type: "string", enum: ["weekly", "daily"], default: "weekly" }, description: "Kraken candle size for Solana. Daily only reaches back ~720 days." }
-  ];
-  var provenance = {
-    type: "object",
-    description: "Where every number came from.",
-    properties: {
-      source: { type: "string", enum: ["live", "snapshot"] },
-      method: { type: "string" },
-      months: { type: "object" },
-      fallback: { type: "boolean", description: "true if any asset used cached or snapshot data because the live source failed" },
-      warnings: { type: "array", items: { type: "string" } },
-      assets: {
-        type: "array",
-        items: {
-          type: "object",
-          properties: {
-            asset: { type: "string" },
-            source: { type: "string" },
-            url: { type: "string" },
-            retrievedAt: { type: "string", format: "date-time" },
-            method: { type: "string" },
-            frequency: { type: "string" },
-            datingRule: { type: "string" },
-            observationsPerMonth: { type: "object", additionalProperties: { type: "integer" } },
-            cache: { type: "string", enum: ["hit", "miss", "stale", "none"] },
-            fallback: { type: "boolean" },
-            warnings: { type: "array", items: { type: "string" } }
-          }
-        }
-      }
+  // lib/api/router.ts
+  function parseQuery(qs) {
+    const out = {};
+    for (const part of qs.split("&")) {
+      if (!part) continue;
+      const [k, v = ""] = part.split("=");
+      out[decodeURIComponent(k.replace(/\+/g, " "))] = decodeURIComponent(v.replace(/\+/g, " "));
     }
-  };
-  var ok = (description) => ({
-    "200": { description, content: { "application/json": { schema: { type: "object", properties: { provenance: { $ref: "#/components/schemas/Provenance" } } } } } },
-    "400": { description: "Invalid parameters" },
-    "422": { description: "Valid parameters, but the maths has no answer (e.g. \u03A3 not positive definite)" },
-    "429": { description: "Rate limited (Retry-After header)" }
-  });
-  var openApiSpec = {
-    openapi: "3.1.0",
-    info: {
-      title: "Portfolio Explorer API",
-      version: "1.0.0",
-      description: "Real monthly data for the S&P 500, gold and Solana, and the Markowitz minimum-variance maths behind an IB Math AA HL IA. Every response carries a provenance block."
-    },
-    paths: {
-      "/api/prices": { get: { summary: "Monthly prices", parameters: common, responses: ok("Monthly prices per asset") } },
-      "/api/returns": { get: { summary: "Monthly simple returns R = P_t/P_{t\u22121} \u2212 1", parameters: common, responses: ok("Monthly returns") } },
-      "/api/stats": {
-        get: { summary: "Means, sample variances (n \u2212 1), SDs, covariance & correlation matrices, geometric means, annualised figures", parameters: common, responses: ok("Statistics") }
-      },
-      "/api/optimize": {
-        post: {
-          summary: "Minimum-variance weights for a target monthly return (Lagrange multipliers)",
-          requestBody: {
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["targetReturn"],
-                  properties: {
-                    assets: { type: "string", example: "SPX,XAU,SOL" },
-                    from: { type: "string" },
-                    to: { type: "string" },
-                    method: { type: "string", enum: ["average", "close"] },
-                    source: { type: "string", enum: ["live", "snapshot"] },
-                    targetReturn: { type: "number", example: 0.02 },
-                    amount: { type: "number", example: 1e3 },
-                    includeSteps: { type: "boolean", description: "include every Gauss\u2013Jordan row operation" }
-                  }
-                }
-              }
-            }
-          },
-          responses: ok("\u03A3, \u03A3\u207B\xB9, det \u03A3, A, B, C, D, \u03BB\u2081, \u03BB\u2082, weights, dollars, variance, volatility and checks")
+    return out;
+  }
+  function route(method, endpoint, query, bodyText, load, docs = () => openApiSpec) {
+    var _a, _b, _c;
+    try {
+      const get = (k) => query[k];
+      switch (endpoint) {
+        case "prices":
+          return { status: 200, body: pricesPayload(load(parseCommon(get))) };
+        case "returns":
+          return { status: 200, body: returnsPayload(load(parseCommon(get))) };
+        case "stats":
+          return { status: 200, body: statsPayload(load(parseCommon(get))) };
+        case "frontier":
+          return {
+            status: 200,
+            body: frontierPayload(load(parseCommon(get)), num(get("from_mu"), "from_mu", 0.01), num(get("to_mu"), "to_mu", 0.034), num(get("step"), "step", 1e-3))
+          };
+        case "explore/sensitivity": {
+          let pair;
+          try {
+            pair = parseAssets((_a = get("pair")) != null ? _a : "SPX,XAU");
+          } catch (e) {
+            throw new BadRequest(e.message);
+          }
+          if (pair.length !== 2) throw new BadRequest("pair must name exactly two assets, e.g. SPX,XAU");
+          const rhos = ((_b = get("rho")) != null ? _b : "-0.5,0,0.5").split(",").map((r) => num(r, "rho"));
+          if (rhos.length > 50) throw new BadRequest("at most 50 rho values");
+          return { status: 200, body: sensitivityPayload(load(parseCommon(get)), pair, rhos) };
         }
-      },
-      "/api/frontier": {
-        get: {
-          summary: "Efficient-frontier points, minimum-variance portfolio, asymptotes and no-short-selling range",
-          parameters: [
-            ...common,
-            { name: "from_mu", in: "query", schema: { type: "number", default: 0.01 } },
-            { name: "to_mu", in: "query", schema: { type: "number", default: 0.034 } },
-            { name: "step", in: "query", schema: { type: "number", default: 1e-3 } }
-          ],
-          responses: ok("Frontier")
+        case "optimize": {
+          if (method !== "POST") throw new BadRequest("optimize needs POST with a JSON body");
+          let body;
+          try {
+            body = JSON.parse(bodyText != null ? bodyText : "");
+          } catch {
+            throw new BadRequest("body must be JSON");
+          }
+          const q = parseCommon((k) => body[k]);
+          return { status: 200, body: optimizePayload(load(q), num(body.targetReturn, "targetReturn"), num(body.amount, "amount", 1e3), body.includeSteps === true) };
         }
-      },
-      "/api/explore/sensitivity": {
-        get: {
-          summary: "Recompute the minimum-variance portfolio after replacing one correlation (checks \u03A3 stays positive definite)",
-          parameters: [
-            ...common,
-            { name: "pair", in: "query", schema: { type: "string", default: "SPX,XAU" } },
-            { name: "rho", in: "query", schema: { type: "string", default: "-0.5,0,0.5" } }
-          ],
-          responses: ok("One result per \u03C1; invalid \u03C1 values carry an error message")
+        case "snapshot": {
+          const ds = load({ assets: ["SPX", "XAU", "SOL"], method: "average", source: "snapshot" });
+          return { status: 200, body: { meta: SNAPSHOT_META, data: SNAPSHOT, provenance: pricesPayload(ds).provenance } };
         }
-      },
-      "/api/snapshot": { get: { summary: "The bundled IA dataset (works offline)", responses: ok("Snapshot") } },
-      "/api/docs": { get: { summary: "This OpenAPI document", responses: { "200": { description: "OpenAPI JSON" } } } }
-    },
-    components: { schemas: { Provenance: provenance } }
-  };
+        case "docs":
+          return { status: 200, body: docs() };
+        default:
+          return { status: 404, body: { error: `unknown endpoint "${endpoint}"` } };
+      }
+    } catch (e) {
+      if (e instanceof BadRequest) return { status: 400, body: { error: e.message } };
+      if (e instanceof Unprocessable) return { status: 422, body: { error: e.message, details: e.details } };
+      return { status: 500, body: { error: (_c = e.message) != null ? _c : "internal error" } };
+    }
+  }
 
   // lib/data/calendar.ts
   var NYSE_HOLIDAYS = /* @__PURE__ */ new Set([
@@ -761,249 +1068,6 @@ var PortfolioExplorer = (() => {
   function isIncompleteMonth(month2, now = /* @__PURE__ */ new Date()) {
     return month2 >= now.toISOString().slice(0, 7);
   }
-
-  // data/snapshot.json
-  var snapshot_default = [
-    {
-      month: "2023-08",
-      sp500: 4457.36,
-      gold: 1919,
-      solana: 22.57
-    },
-    {
-      month: "2023-09",
-      sp500: 4515.77,
-      gold: 1916,
-      solana: 19.3625
-    },
-    {
-      month: "2023-10",
-      sp500: 4269.4,
-      gold: 1916,
-      solana: 25.255
-    },
-    {
-      month: "2023-11",
-      sp500: 4460.06,
-      gold: 1984,
-      solana: 53.342
-    },
-    {
-      month: "2023-12",
-      sp500: 4685.05,
-      gold: 2026,
-      solana: 80.42
-    },
-    {
-      month: "2024-01",
-      sp500: 4804.49,
-      gold: 2034,
-      solana: 97.674
-    },
-    {
-      month: "2024-02",
-      sp500: 5011.96,
-      gold: 2023,
-      solana: 110.555
-    },
-    {
-      month: "2024-03",
-      sp500: 5170.57,
-      gold: 2158,
-      solana: 168.2275
-    },
-    {
-      month: "2024-04",
-      sp500: 5112.49,
-      gold: 2331,
-      solana: 159.58
-    },
-    {
-      month: "2024-05",
-      sp500: 5235.23,
-      gold: 2351,
-      solana: 156.026
-    },
-    {
-      month: "2024-06",
-      sp500: 5415.14,
-      gold: 2326,
-      solana: 150.265
-    },
-    {
-      month: "2024-07",
-      sp500: 5538,
-      gold: 2398,
-      solana: 157.566
-    },
-    {
-      month: "2024-08",
-      sp500: 5478.21,
-      gold: 2470,
-      solana: 143.775
-    },
-    {
-      month: "2024-09",
-      sp500: 5621.26,
-      gold: 2571,
-      solana: 137.12
-    },
-    {
-      month: "2024-10",
-      sp500: 5792.32,
-      gold: 2690,
-      solana: 155.794
-    },
-    {
-      month: "2024-11",
-      sp500: 5929.92,
-      gold: 2651,
-      solana: 220.04
-    },
-    {
-      month: "2024-12",
-      sp500: 6010.91,
-      gold: 2648,
-      solana: 215.2175
-    },
-    {
-      month: "2025-01",
-      sp500: 5979.52,
-      gold: 2710,
-      solana: 216.558
-    },
-    {
-      month: "2025-02",
-      sp500: 6038.69,
-      gold: 2895,
-      solana: 174.165
-    },
-    {
-      month: "2025-03",
-      sp500: 5683.98,
-      gold: 2983,
-      solana: 136.435
-    },
-    {
-      month: "2025-04",
-      sp500: 5369.5,
-      gold: 3218,
-      solana: 133.29
-    },
-    {
-      month: "2025-05",
-      sp500: 5810.92,
-      gold: 3309,
-      solana: 167.46
-    },
-    {
-      month: "2025-06",
-      sp500: 6029.95,
-      gold: 3353,
-      solana: 151.0575
-    },
-    {
-      month: "2025-07",
-      sp500: 6296.5,
-      gold: 3340,
-      solana: 170.108
-    },
-    {
-      month: "2025-08",
-      sp500: 6408.95,
-      gold: 3368,
-      solana: 190.135
-    },
-    {
-      month: "2025-09",
-      sp500: 6584.02,
-      gold: 3668,
-      solana: 222.84
-    },
-    {
-      month: "2025-10",
-      sp500: 6735.69,
-      gold: 4058.33,
-      solana: 203.868
-    },
-    {
-      month: "2025-11",
-      sp500: 6740.89,
-      gold: 4087,
-      solana: 148.92
-    },
-    {
-      month: "2025-12",
-      sp500: 6853.03,
-      gold: 4309,
-      solana: 130.224
-    },
-    {
-      month: "2026-01",
-      sp500: 6929.12,
-      gold: 4753,
-      solana: 134.3875
-    },
-    {
-      month: "2026-02",
-      sp500: 6893.81,
-      gold: 5020,
-      solana: 85.195
-    },
-    {
-      month: "2026-03",
-      sp500: 6654.42,
-      gold: 4856,
-      solana: 89.81
-    },
-    {
-      month: "2026-04",
-      sp500: 6957.01,
-      gold: 4721,
-      solana: 83.728
-    },
-    {
-      month: "2026-05",
-      sp500: 7412.55,
-      gold: 4587,
-      solana: 87.155
-    },
-    {
-      month: "2026-06",
-      sp500: 7450.03,
-      gold: 4228,
-      solana: 68.655
-    },
-    {
-      month: "2026-07",
-      sp500: 7481.34,
-      gold: 4073,
-      solana: 76.77
-    },
-    {
-      month: "2026-08",
-      sp500: 7711.32,
-      gold: 4411,
-      solana: 84.2325
-    }
-  ];
-
-  // data/snapshot.meta.json
-  var snapshot_meta_default = {
-    description: "Monthly average prices used in the IA. S&P 500: FRED SP500 / Shiller monthly averages. Gold: World Bank Pink Sheet monthly average (US$/troy oz). Solana: average of Kraken SOLUSD weekly closes in each month.",
-    method: "average",
-    sources: {
-      sp500: "https://fred.stlouisfed.org/series/SP500",
-      gold: "https://www.worldbank.org/en/research/commodity-markets",
-      solana: "https://api.kraken.com/0/public/OHLC?pair=SOLUSD&interval=10080"
-    },
-    observationsPerMonth: "S&P 500: trading days in month (FRED daily closes averaged); gold: 1 (World Bank monthly figure); Solana: 4-5 Kraken weekly closes"
-  };
-
-  // lib/data/snapshot.ts
-  var SNAPSHOT = snapshot_default;
-  var SNAPSHOT_META = snapshot_meta_default;
-  var SNAPSHOT_MONTHS = SNAPSHOT.map((r) => r.month);
 
   // lib/data/assemble.ts
   var SNAPSHOT_SOURCE = {
@@ -1285,15 +1349,6 @@ var PortfolioExplorer = (() => {
     const series = q.source === "snapshot" ? q.assets.map((a) => snapshotSeries(a)) : q.assets.map((a) => liveSeries(a, q));
     return assembleDataset(q, series);
   }
-  function parseQuery(qs) {
-    const out = {};
-    for (const part of qs.split("&")) {
-      if (!part) continue;
-      const [k, v = ""] = part.split("=");
-      out[decodeURIComponent(k.replace(/\+/g, " "))] = decodeURIComponent(v.replace(/\+/g, " "));
-    }
-    return out;
-  }
   function gasDocs() {
     return {
       ...openApiSpec,
@@ -1303,60 +1358,8 @@ var PortfolioExplorer = (() => {
       }
     };
   }
-  function route(method, endpoint, query, bodyText) {
-    var _a, _b, _c;
-    try {
-      const get = (k) => query[k];
-      const load = (q) => loadMonthlyPrices(q);
-      switch (endpoint) {
-        case "prices":
-          return { status: 200, body: pricesPayload(load(parseCommon(get))) };
-        case "returns":
-          return { status: 200, body: returnsPayload(load(parseCommon(get))) };
-        case "stats":
-          return { status: 200, body: statsPayload(load(parseCommon(get))) };
-        case "frontier":
-          return {
-            status: 200,
-            body: frontierPayload(load(parseCommon(get)), num(get("from_mu"), "from_mu", 0.01), num(get("to_mu"), "to_mu", 0.034), num(get("step"), "step", 1e-3))
-          };
-        case "explore/sensitivity": {
-          let pair;
-          try {
-            pair = parseAssets((_a = get("pair")) != null ? _a : "SPX,XAU");
-          } catch (e) {
-            throw new BadRequest(e.message);
-          }
-          if (pair.length !== 2) throw new BadRequest("pair must name exactly two assets, e.g. SPX,XAU");
-          const rhos = ((_b = get("rho")) != null ? _b : "-0.5,0,0.5").split(",").map((r) => num(r, "rho"));
-          if (rhos.length > 50) throw new BadRequest("at most 50 rho values");
-          return { status: 200, body: sensitivityPayload(load(parseCommon(get)), pair, rhos) };
-        }
-        case "optimize": {
-          if (method !== "POST") throw new BadRequest("optimize needs POST with a JSON body");
-          let body;
-          try {
-            body = JSON.parse(bodyText != null ? bodyText : "");
-          } catch {
-            throw new BadRequest("body must be JSON");
-          }
-          const q = parseCommon((k) => body[k]);
-          return { status: 200, body: optimizePayload(load(q), num(body.targetReturn, "targetReturn"), num(body.amount, "amount", 1e3), body.includeSteps === true) };
-        }
-        case "snapshot": {
-          const ds = load({ assets: ["SPX", "XAU", "SOL"], method: "average", source: "snapshot" });
-          return { status: 200, body: { meta: SNAPSHOT_META, data: SNAPSHOT, provenance: pricesPayload(ds).provenance } };
-        }
-        case "docs":
-          return { status: 200, body: gasDocs() };
-        default:
-          return { status: 404, body: { error: `unknown endpoint "${endpoint}"` } };
-      }
-    } catch (e) {
-      if (e instanceof BadRequest) return { status: 400, body: { error: e.message } };
-      if (e instanceof Unprocessable) return { status: 422, body: { error: e.message, details: e.details } };
-      return { status: 500, body: { error: (_c = e.message) != null ? _c : "internal error" } };
-    }
+  function route2(method, endpoint, query, bodyText) {
+    return route(method, endpoint, query, bodyText, loadMonthlyPrices, gasDocs);
   }
   function rateLimited() {
     var _a;
@@ -1381,7 +1384,7 @@ var PortfolioExplorer = (() => {
     if (endpoint) {
       delete params.api;
       if (rateLimited()) return jsonOutput({ status: 429, body: { error: "Too many requests, slow down." } });
-      return jsonOutput(route("GET", endpoint, params));
+      return jsonOutput(route2("GET", endpoint, params));
     }
     return HtmlService.createHtmlOutputFromFile("Index").setTitle("Portfolio Explorer").addMetaTag("viewport", "width=device-width, initial-scale=1");
   }
@@ -1391,12 +1394,12 @@ var PortfolioExplorer = (() => {
     const endpoint = (_b = params.api) != null ? _b : "optimize";
     delete params.api;
     if (rateLimited()) return jsonOutput({ status: 429, body: { error: "Too many requests, slow down." } });
-    return jsonOutput(route("POST", endpoint, params, (_d = (_c = e == null ? void 0 : e.postData) == null ? void 0 : _c.contents) != null ? _d : null));
+    return jsonOutput(route2("POST", endpoint, params, (_d = (_c = e == null ? void 0 : e.postData) == null ? void 0 : _c.contents) != null ? _d : null));
   }
   function handleApi(method, url, bodyText) {
     const [path, qs = ""] = url.split("?");
     const endpoint = path.replace(/^\/api\//, "");
-    const r = rateLimited() ? { status: 429, body: { error: "Too many requests, slow down." } } : route(method, endpoint, parseQuery(qs), bodyText);
+    const r = rateLimited() ? { status: 429, body: { error: "Too many requests, slow down." } } : route2(method, endpoint, parseQuery(qs), bodyText);
     return { status: r.status, body: JSON.stringify(r.body) };
   }
   function serviceUrl() {
@@ -1419,7 +1422,7 @@ var PortfolioExplorer = (() => {
         Logger.log(`${asset}: FAILED (${e.message})`);
       }
     }
-    const r = route("GET", "stats", { source: "live", from: "2023-08" });
+    const r = route2("GET", "stats", { source: "live", from: "2023-08" });
     Logger.log(`Live statistics: HTTP ${r.status}. Warnings: ${JSON.stringify((_d = (_c = r.body.provenance) == null ? void 0 : _c.warnings) != null ? _d : r.body)}`);
   }
   return __toCommonJS(server_exports);

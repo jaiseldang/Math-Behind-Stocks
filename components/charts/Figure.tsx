@@ -2,7 +2,7 @@
 import { useRef, useState } from "react";
 import { useData } from "@/components/providers";
 import { exportCsv, exportPng, exportSvg, slug } from "@/lib/export";
-import { DOWNLOADS_ALLOWED } from "@/lib/target";
+import { useDownloadsAllowed } from "@/lib/target";
 
 export interface TableData {
   header: string[];
@@ -29,6 +29,7 @@ export function Figure({
   const ref = useRef<HTMLDivElement>(null);
   const { sourceNote } = useData();
   const [showTable, setShowTable] = useState(false);
+  const downloadsAllowed = useDownloadsAllowed();
   const cap = caption ?? sourceNote;
   const svg = () => ref.current?.querySelector("svg.chart") as SVGSVGElement | null;
   const name = slug(title);
@@ -38,7 +39,7 @@ export function Figure({
       <div className="figure-head">
         <div className="figure-title">{title}</div>
         <div className="export-menu" role="group" aria-label={`Export ${title}`}>
-          {DOWNLOADS_ALLOWED && (
+          {downloadsAllowed && (
             <>
               <button className="btn" onClick={() => svg() && exportPng(svg()!, name, title, cap)}>PNG</button>
               <button className="btn" onClick={() => svg() && exportSvg(svg()!, name, title, cap)}>SVG</button>

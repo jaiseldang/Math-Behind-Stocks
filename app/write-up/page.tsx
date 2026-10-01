@@ -9,7 +9,7 @@ import { Eq } from "@/components/pattern/Tex";
 import { useData } from "@/components/providers";
 import { ASSETS, DEFAULT_ASSETS } from "@/lib/assets";
 import { exportCsv } from "@/lib/export";
-import { DOWNLOADS_ALLOWED } from "@/lib/target";
+import { useDownloadsAllowed } from "@/lib/target";
 import { pct, texMatrixPlain, texNum } from "@/lib/format";
 import { frontierVariance, optimalWeights } from "@/lib/math";
 import { useModel } from "@/lib/useModel";
@@ -17,6 +17,7 @@ import { useModel } from "@/lib/useModel";
 export default function WriteUpPage() {
   const { months, returnMonths, prices, stats, k, mvp, linear, zeros, asym } = useModel();
   const data = useData();
+  const downloadsAllowed = useDownloadsAllowed();
   const band = zeros.noShortInterval;
   const at2 = optimalWeights(k, 0.02);
   const names = DEFAULT_ASSETS.map((a) => ASSETS[a].name);
@@ -65,9 +66,9 @@ export default function WriteUpPage() {
         n={10}
         title="For my write-up"
         lead={
-          DOWNLOADS_ALLOWED
+          downloadsAllowed
             ? "Everything you need to build the IA document. Every chart on the site has PNG, SVG and CSV buttons; every equation has a Copy LaTeX button. Each export carries a caption with the data source and date range."
-            : "Everything you need to build the IA document. Every equation has a Copy LaTeX button, and every chart has a Table view you can select and copy. This hosted version can't download files; the full site adds PNG, SVG and CSV export."
+            : "Everything you need to build the IA document. Every equation has a Copy LaTeX button, and every chart has a Table view you can select and copy. Saving files isn't available in this view."
         }
       />
 
@@ -84,7 +85,7 @@ export default function WriteUpPage() {
       <section className="stage">
         <div className="figure-head">
           <h2 style={{ margin: 0 }}>Key numbers</h2>
-          {DOWNLOADS_ALLOWED && <button className="btn" onClick={() => exportCsv(["Quantity", "Value"], keyNumbers, "key-numbers", data.sourceNote)}>Download CSV</button>}
+          {downloadsAllowed && <button className="btn" onClick={() => exportCsv(["Quantity", "Value"], keyNumbers, "key-numbers", data.sourceNote)}>Download CSV</button>}
         </div>
         <div className="table-wrap" style={{ maxHeight: 380, overflowY: "auto", marginTop: 8 }} tabIndex={0} role="region" aria-label="Key numbers table">
           <table className="data">

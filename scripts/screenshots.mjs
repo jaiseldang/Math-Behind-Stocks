@@ -25,7 +25,8 @@ for (const theme of (process.env.THEMES ?? "light").split(",")) {
       const errors = [];
       page.on("console", (m) => m.type() === "error" && !/tradingview|ERR_TUNNEL|ERR_CONNECTION|Failed to load resource/i.test(m.text()) && errors.push(m.text()));
       page.on("pageerror", (e) => errors.push(e.message));
-      await page.goto(base + r, { waitUntil: "networkidle", timeout: 60000 }).catch((e) => errors.push(e.message));
+      // HASH=1: the Apps Script build uses hash routes (/#/data)
+      await page.goto(process.env.HASH ? `${base}/#${r}` : base + r, { waitUntil: "networkidle", timeout: 60000 }).catch((e) => errors.push(e.message));
       await page.waitForTimeout(800);
       const name = `${out}/${(r === "/" ? "home" : r.slice(1).replace(/\//g, "-"))}-${label}${theme === "light" ? "" : "-" + theme}.png`;
       await page.screenshot({ path: name, fullPage: true });

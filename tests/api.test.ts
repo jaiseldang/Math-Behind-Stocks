@@ -15,45 +15,13 @@ import { GET as sensitivity } from "@/app/api/explore/sensitivity/route";
 import { GET as snapshot } from "@/app/api/snapshot/route";
 import { GET as docs } from "@/app/api/docs/route";
 import { expectSig } from "./helpers";
+import { fakeFetch } from "./fixtures/upstream";
 
 const base = "http://localhost/api";
 const get = async (handler: (r: Request) => Promise<Response> | Response, url: string) => {
   const res = await handler(new Request(base + url));
   return { status: res.status, body: await res.json() };
 };
-
-// ---- Fake upstream sources -------------------------------------------------
-const days = (from: string, to: string) => {
-  const out: string[] = [];
-  for (let d = new Date(from + "T00:00:00Z"); d <= new Date(to + "T00:00:00Z"); d = new Date(d.getTime() + 86400000)) out.push(d.toISOString().slice(0, 10));
-  return out;
-};
-const wave = (i: number, base: number, amp: number, period: number) => base * (1 + amp * Math.sin(i / period) + i * 0.0004);
-
-function fakeFetch(input: RequestInfo | URL) {
-  const url = String(input);
-  if (url.includes("stlouisfed")) {
-    const obs = days("2023-06-01", "2026-09-29")
-      .filter((d) => ![0, 6].includes(new Date(d).getUTCDay()))
-      .map((date, i) => ({ date, value: i % 50 === 0 ? "." : wave(i, 4500, 0.05, 40).toFixed(2) }));
-    return Promise.resolve(Response.json({ observations: obs }));
-  }
-  if (url.includes("gold-prices")) {
-    const months = days("2023-01-01", "2026-08-31").filter((d) => d.endsWith("-01"));
-    return Promise.resolve(new Response("Date,Price\n" + months.map((d, i) => `${d.slice(0, 7)},${wave(i, 1900, 0.04, 3).toFixed(3)}`).join("\n")));
-  }
-  if (url.includes("kraken")) {
-    const weekly = url.includes("10080");
-    const start = Date.parse("2023-06-01T00:00:00Z") / 1000; // a Thursday
-    const step = weekly ? 7 * 86400 : 86400;
-    const candles = [];
-    for (let t = start, i = 0; t < Date.parse("2026-09-30T00:00:00Z") / 1000; t += step, i++) {
-      candles.push([t, "0", "0", "0", wave(i, 50, 0.3, 5).toFixed(2), "0", "0", 1]);
-    }
-    return Promise.resolve(Response.json({ error: [], result: { SOLUSD: weekly ? candles : candles.slice(-720), last: 0 } }));
-  }
-  return Promise.reject(new TypeError("unexpected url " + url));
-}
 
 let dir: string;
 beforeAll(() => {

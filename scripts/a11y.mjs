@@ -15,7 +15,8 @@ for (const [colorScheme, width] of [["light", 1280], ["dark", 1280], ["light", 3
   const ctx = await browser.newContext({ colorScheme, viewport: { width, height: 900 } });
   for (const r of routes) {
     const page = await ctx.newPage();
-    await page.goto(base + r, { waitUntil: "networkidle" });
+    // HASH=1: the Apps Script build uses hash routes (/#/data)
+    await page.goto(process.env.HASH ? `${base}/#${r}` : base + r, { waitUntil: "networkidle" });
     const res = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).exclude(".tv-box").analyze();
     total += res.violations.length;
     console.log(`${res.violations.length ? "✗" : "✓"} ${r} (${colorScheme}, ${width}px)`);

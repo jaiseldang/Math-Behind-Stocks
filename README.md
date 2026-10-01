@@ -11,6 +11,7 @@ Each page follows the same pattern: **question → your guess → intuition → 
 ## Contents
 
 - [Quick start](#quick-start)
+- [Google Apps Script version (copy and paste, no install)](#google-apps-script-version)
 - [Getting a free FRED API key](#getting-a-free-fred-api-key)
 - [Deploying to Vercel](#deploying-to-vercel)
 - [The pages](#the-pages)
@@ -40,12 +41,19 @@ Other commands:
 | Command | What it does |
 |---|---|
 | `npm test` | Run all unit, property and API tests (no network needed) |
-| `npm run typecheck` | TypeScript type check |
+| `npm run typecheck` | TypeScript type check (Next.js site and Apps Script build) |
+| `npm run build:gas` | Regenerate the Google Apps Script files in `apps-script/dist/` |
 | `npm run build && npm start` | Production build and server |
 | `node scripts/screenshots.mjs http://localhost:3000 docs/screenshots` | Visit every page, report console errors, save full-page screenshots (`MOBILE=1`, `THEMES=light,dark` for more) |
 | `node scripts/a11y.mjs http://localhost:3000` | Accessibility audit (axe-core, WCAG 2 A/AA) of every page in light, dark and phone width |
 
 The two scripts need a Chromium browser for Playwright: run `npx playwright install chromium` once, or set `CHROMIUM_PATH` to an existing Chromium.
+
+## Google Apps Script version
+
+Don't want to install Node.js? The whole site, including the API, also runs as a **Google Apps Script web app**. Paste three generated files ([`apps-script/dist/`](apps-script/dist/)) into a new project at <https://script.google.com> and deploy. Step-by-step instructions: **[apps-script/README.md](apps-script/README.md)**.
+
+The files are generated from the same source (`npm run build:gas`), and tests run the generated `Code.gs` directly, so both versions produce identical numbers.
 
 ## Getting a free FRED API key
 
@@ -153,12 +161,13 @@ Robustness: upstream requests time out after 15 s and are retried with exponenti
 
 ## Tests
 
-`npm test` runs 73 tests (Vitest + fast-check), including:
+`npm test` runs 85 tests (Vitest + fast-check), including:
 
 - **The snapshot reproduces the IA**, each value to the significant figures shown in the IA: means, SDs, correlations, A, B, C, D, the minimum-variance portfolio, the 2% portfolio (weights, σ, λ₁, λ₂), g and h, the no-short interval [0.019439, 0.028941], the slope √(D/A) = 0.25841, the geometric means, and the S&P–gold sensitivity (0.017091, 0.024780, 0.029772).
 - **Property tests** on hundreds of random positive-definite matrices: ΣΣ⁻¹ ≈ I; Gauss–Jordan = adjugate/determinant; weights sum to 1 and hit the target for any μ*; wᵀΣw = frontier formula; Σg = 1, Σh = 0; the optimum is never beaten by a feasible perturbation; ∇f = λ₂∇g at the optimum; sign of the minimum-variance weight = sign of 1 − β.
 - **Data layer:** resampling, month alignment, Kraken dating rule, retries/backoff/Retry-After, daily cache with stale fallback.
 - **API routes** called directly, with fake upstream sources (no network): provenance on every response, API key redaction, cache hits, snapshot fallback, positive-definite guard, validation errors, OpenAPI document.
+- **The generated Apps Script `Code.gs`**, run in a sandbox with stand-ins for PropertiesService, UrlFetchApp, Utilities and so on: IA numbers, `doGet`/`doPost`/`handleApi`, the compressed property cache (within the 9 KB limit), stale and snapshot fallbacks, Retry-After handling.
 
 ## Project structure
 
@@ -175,7 +184,8 @@ lib/
   api/               query parsing, rate limit, endpoint logic, OpenAPI spec
 data/                snapshot.json (the IA data) + metadata
 tests/               Vitest tests
-scripts/             screenshot and accessibility scripts
+apps-script/         Google Apps Script build: src/ (backend + browser entry + shims), dist/ (paste-ready files)
+scripts/             screenshot, accessibility, Apps Script build and local preview scripts
 docs/screenshots/    a full-page screenshot of every page
 ```
 

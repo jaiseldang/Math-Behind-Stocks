@@ -9,8 +9,9 @@
     "start": "next start",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit",
-    "screenshots": "node scripts/screenshots.mjs"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p apps-script",
+    "screenshots": "node scripts/screenshots.mjs",
+    "build:gas": "node scripts/build-apps-script.mjs"
   },
   "engines": {
     "node": ">=20"
@@ -29,8 +30,10 @@
     "@types/node": "^26.6.3",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "esbuild": "^0.28.2",
     "fast-check": "^4.10.2",
     "playwright": "^1.63.0",
+    "preact": "^11.0.0",
     "typescript": "^5.9.3",
     "vitest": "^5.0.2"
   }

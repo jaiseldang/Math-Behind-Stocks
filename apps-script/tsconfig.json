@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "..",
+    "paths": { "@/*": ["./*"], "next/link": ["./apps-script/src/shims/next-link.tsx"], "next/navigation": ["./apps-script/src/shims/next-navigation.ts"] },
+    "plugins": []
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "../next-env.d.ts"]
+}

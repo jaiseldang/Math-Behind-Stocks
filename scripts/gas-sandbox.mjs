@@ -31,7 +31,20 @@ export function createGasSandbox(code, upstream) {
   };
   const sandbox = {
     PropertiesService: { getScriptProperties: () => props },
-    CacheService: { getScriptCache: () => ({ get: (k) => cache.get(k) ?? null, put: (k, v) => void cache.set(k, v) }) },
+    CacheService: {
+      getScriptCache: () => ({
+        get: (k) => cache.get(k) ?? null,
+        put: (k, v) => void cache.set(k, v),
+        getAll: (keys) => Object.fromEntries(keys.filter((k) => cache.has(k)).map((k) => [k, cache.get(k)])),
+        putAll: (o) => {
+          for (const [k, v] of Object.entries(o)) {
+            if (Buffer.byteLength(v) > 100 * 1024) throw new Error(`cache value ${k} too large`); // the real 100 KB limit
+            cache.set(k, v);
+          }
+        },
+        remove: (k) => void cache.delete(k),
+      }),
+    },
     UrlFetchApp: {
       fetch: (url) => {
         fetchLog.push(url);
@@ -52,6 +65,7 @@ export function createGasSandbox(code, upstream) {
       createTextOutput: (text) => ({ text, mime: "", setMimeType(m) { this.mime = m; return this; } }),
     },
     HtmlService: {
+      createHtmlOutput: (html) => ({ html, title: "", meta: {}, setTitle(t) { this.title = t; return this; }, addMetaTag(k, v) { this.meta[k] = v; return this; } }),
       createHtmlOutputFromFile: (name) => ({ file: name, title: "", meta: {}, setTitle(t) { this.title = t; return this; }, addMetaTag(k, v) { this.meta[k] = v; return this; } }),
     },
     Session: { getTemporaryActiveUserKey: () => "local-user" },

@@ -34,7 +34,7 @@ cp .env.example .env.local     # then paste your FRED key into .env.local (optio
 npm run dev                    # open http://localhost:3000
 ```
 
-The site works **without any API key**: it uses the bundled IA snapshot (`data/snapshot.json`) by default. Switch the sidebar's **Data** control to **Live** to use live sources. If a source is unavailable, a banner says so and the snapshot fills in for that asset.
+The site works **without any API key**: it uses the bundled IA snapshot (`data/snapshot.json`) by default. Switch the sidebar's **Data** control to **Live** to use live sources. If a source is unavailable, a banner says so and the snapshot fills in for that asset. **TradingView** uses bundled TradingView prices (see [Data sources](#data-sources)); like the snapshot, it needs no key or network.
 
 Other commands:
 
@@ -105,7 +105,7 @@ Site-wide features:
 
 The OpenAPI 3.1 spec is served at **`/api/docs`**. Every response includes a `provenance` block with the source name, URL, retrieval timestamp, resampling method, observations used per month, cache status, and whether any fallback was used.
 
-Common query parameters: `assets` (default `SPX,XAU,SOL`), `from`/`to` (`YYYY-MM`), `method` (`average` | `close`), `source` (`live` | `snapshot`), `solInterval` (`weekly` | `daily`).
+Common query parameters: `assets` (default `SPX,XAU,SOL`), `from`/`to` (`YYYY-MM`), `method` (`average` | `close`), `source` (`live` | `snapshot` | `tradingview`), `solInterval` (`weekly` | `daily`).
 
 | Endpoint | Returns |
 |---|---|
@@ -141,7 +141,17 @@ Robustness: upstream requests time out after 15 s and are retried with exponenti
 
 **How weekly candles are dated.** Kraken's weekly candles run Thursday to Wednesday (UTC). Each one is dated by its **last day** (the Wednesday its close is recorded). This rule reproduces the IA exactly: for every one of the 37 months, the snapshot's Solana average × the number of Wednesdays is a whole number of cents, and no other weekday works (see the check on `/data` and in `tests/data.test.ts`).
 
-**TradingView.** TradingView has no public data API and scraping it breaks its terms, so it is **not** used for data. Its free mini-chart widgets appear on the home page for context only.
+**TradingView.** TradingView has no public data API and scraping it breaks its terms, so the website never fetches from it. Its free mini-chart widgets appear on the home page for context. In addition, `data/tradingview.json` bundles TradingView prices for the same period (`source=tradingview`):
+
+| Asset | TradingView symbol | Stored |
+|---|---|---|
+| S&P 500 | `SP:SPX` | daily closes |
+| Gold | `TVC:GOLD` (spot, US$/troy oz) | daily closes, each dated by the session it closes |
+| Solana | `KRAKEN:SOLUSD` | weekly closes (Monday–Sunday weeks, dated by the Sunday) |
+
+These were fetched through the TradingView connector in a Claude Code session (Aug 2023 to Sep 2026, retrieved 2026-10-07) and checked automatically: every month-end close matches TradingView's own monthly bars, and the S&P 500 monthly averages equal the IA's FRED averages to the cent in 36 of 37 months. Because the raw daily and weekly closes are stored, both `method=average` and `method=close` work. The website cannot refresh this file by itself. To update it, ask Claude (with the TradingView connector) to re-fetch the same symbols and regenerate `data/tradingview.json`, then run `npm test`.
+
+**A data issue the comparison found.** The IA snapshot's S&P 500 value for September 2023 (4515.77) is the close on 1 September 2023 (4515.78), not the month's average of 20 daily closes (4409.10). The snapshot is kept unchanged so the site reproduces the IA exactly. The Data page (Experiment D) shows the effect of correcting it: the minimum-variance σ goes from 2.371% to 2.298% and the S&P weight from 66.9% to 69.1%, while the no-short-selling band hardly moves (1.944%–2.894% becomes 1.943%–2.886%).
 
 **The snapshot.** `data/snapshot.json` holds the exact monthly averages used in the IA (Aug 2023 to Aug 2026, 37 months, 36 returns); `data/snapshot.meta.json` describes their sources.
 
@@ -166,6 +176,7 @@ Robustness: upstream requests time out after 15 s and are retried with exponenti
 - **The snapshot reproduces the IA**, each value to the significant figures shown in the IA: means, SDs, correlations, A, B, C, D, the minimum-variance portfolio, the 2% portfolio (weights, σ, λ₁, λ₂), g and h, the no-short interval [0.019439, 0.028941], the slope √(D/A) = 0.25841, the geometric means, and the S&P–gold sensitivity (0.017091, 0.024780, 0.029772).
 - **Property tests** on hundreds of random positive-definite matrices: ΣΣ⁻¹ ≈ I; Gauss–Jordan = adjugate/determinant; weights sum to 1 and hit the target for any μ*; wᵀΣw = frontier formula; Σg = 1, Σh = 0; the optimum is never beaten by a feasible perturbation; ∇f = λ₂∇g at the optimum; sign of the minimum-variance weight = sign of 1 − β.
 - **Data layer:** resampling, month alignment, Kraken dating rule, retries/backoff/Retry-After, daily cache with stale fallback.
+- **The bundled TradingView data**: dates and values are well-formed, S&P 500 averages equal the IA's except September 2023, gold is within 1% of the World Bank averages, and `source=tradingview` works through the pipeline and the API.
 - **API routes** called directly, with fake upstream sources (no network): provenance on every response, API key redaction, cache hits, snapshot fallback, positive-definite guard, validation errors, OpenAPI document.
 - **The generated Apps Script `Code.gs`**, run in a sandbox with stand-ins for PropertiesService, UrlFetchApp, Utilities and so on: IA numbers, `doGet`/`doPost`/`handleApi`, the compressed property cache (within the 9 KB limit), stale and snapshot fallbacks, Retry-After handling.
 
@@ -180,9 +191,9 @@ components/
   layout/, ui/       navigation shell, sliders, TradingView widget
 lib/
   math/              the maths engine (no UI code)
-  data/              providers (FRED, gold, Kraken), resampling, calendar, cache, retries, snapshot
+  data/              providers (FRED, gold, Kraken), bundled TradingView data, resampling, calendar, cache, retries, snapshot
   api/               query parsing, rate limit, endpoint logic, OpenAPI spec
-data/                snapshot.json (the IA data) + metadata
+data/                snapshot.json (the IA data) + metadata, tradingview.json (bundled TradingView closes)
 tests/               Vitest tests
 apps-script/         Google Apps Script build: src/ (backend + browser entry + shims), dist/ (paste-ready files)
 scripts/             screenshot, accessibility, Apps Script build and local preview scripts

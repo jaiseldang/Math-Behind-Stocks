@@ -182,6 +182,11 @@ export default function LimitationsPage() {
           <li><a href="/data">Monthly averages vs month-end closes</a>: averaging lowers measured risk by about 18% and adds autocorrelation.</li>
           <li><a href="/explore#investigation-5">The time window</a>: dropping 6 months noticeably moves the no-short band.</li>
           <li>Solana is resampled from weekly candles, the S&amp;P 500 from trading days, and gold is a published monthly average: three different kinds of “monthly price”.</li>
+          <li>
+            <a href="/data">The data provider</a>: TradingView&apos;s prices for the same months move the minimum-risk weights by a few percentage points, but the
+            no-short band by less than 0.02 percentage points. The comparison also shows the IA&apos;s September 2023 S&amp;P 500 value is the 1 September close
+            (4515.78), not the month&apos;s average (4409.10).
+          </li>
           <li>Transaction costs, taxes, the cost of borrowing to short, and exchange risk are all ignored.</li>
         </ul>
       </Experiment>

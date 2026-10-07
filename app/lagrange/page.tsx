@@ -5,7 +5,7 @@ import { Figure, Legend } from "@/components/charts/Figure";
 import { Plot } from "@/components/charts/Plot";
 import { Check, Experiment, Finding, Intuition, MathSteps, PageHeader, Question, Stage } from "@/components/pattern/Stages";
 import { M } from "@/components/pattern/Tex";
-import { useGuess } from "@/components/providers";
+import { useData, useGuess } from "@/components/providers";
 import { Slider } from "@/components/ui/Slider";
 import { ASSETS, DEFAULT_ASSETS } from "@/lib/assets";
 import { pct, sig } from "@/lib/format";
@@ -172,6 +172,7 @@ function Plane({
   reveal: boolean;
 }) {
   const S = k.Sigma;
+  const { sourceNote } = useData();
   const [hover, setHover] = useState<{ w1: number; w2: number; px: number; py: number } | null>(null);
   const opt = optimalWeights(k, target);
   const optVar = frontierVariance(k, target);
@@ -199,7 +200,7 @@ function Plane({
   return (
     <Figure
       title={`Risk contours and the ${pct(target)} target line`}
-      caption="Computed from the covariance matrix and mean returns of the current dataset. The Solana weight is 1 − w₁ − w₂."
+      caption={`Computed from the covariance matrix and mean returns of the current dataset. The Solana weight is 1 − w₁ − w₂. ${sourceNote}`}
       alt={`Contour map of portfolio risk over w1 (S&P 500 weight) and w2 (gold weight). Ellipses are equal-risk curves; a straight line marks all mixes returning ${pct(target)}.${reveal ? ` The optimum is at w1 = ${opt.weights[0].toFixed(3)}, w2 = ${opt.weights[1].toFixed(3)}.` : ""}`}
       note={<Legend items={[{ label: "Equal-risk ellipses", color: "var(--c-neutral)" }, { label: `Mixes returning ${pct(target)}`, color: "var(--c-frontier)" }, ...(reveal ? [{ label: "Tangent ellipse", color: "var(--c-xau)" }, { label: "∇f (risk uphill)", color: "var(--c-you)" }, { label: "∇g (return)", color: "var(--c-spx)" }] : [])]} />}
     >

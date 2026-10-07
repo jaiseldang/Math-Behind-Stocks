@@ -5,7 +5,7 @@ const common = [
   { name: "from", in: "query", schema: { type: "string", pattern: "^\\d{4}-\\d{2}$", example: "2023-08" }, description: "First month (inclusive)." },
   { name: "to", in: "query", schema: { type: "string", pattern: "^\\d{4}-\\d{2}$", example: "2026-08" }, description: "Last month (inclusive)." },
   { name: "method", in: "query", schema: { type: "string", enum: ["average", "close"], default: "average" }, description: "average = mean of the month's closes; close = last close of the month." },
-  { name: "source", in: "query", schema: { type: "string", enum: ["live", "snapshot"], default: "live" }, description: "live = FRED/World Bank/Kraken (cached daily, falls back to snapshot); snapshot = the bundled IA data." },
+  { name: "source", in: "query", schema: { type: "string", enum: ["live", "snapshot", "tradingview"], default: "live" }, description: "live = FRED/World Bank/Kraken (cached daily, falls back to snapshot); snapshot = the bundled IA data; tradingview = bundled TradingView daily/weekly closes (SP:SPX, TVC:GOLD, KRAKEN:SOLUSD), resampled like live data." },
   { name: "solInterval", in: "query", schema: { type: "string", enum: ["weekly", "daily"], default: "weekly" }, description: "Kraken candle size for Solana. Daily only reaches back ~720 days." },
 ];
 
@@ -13,7 +13,7 @@ const provenance = {
   type: "object",
   description: "Where every number came from.",
   properties: {
-    source: { type: "string", enum: ["live", "snapshot"] },
+    source: { type: "string", enum: ["live", "snapshot", "tradingview"] },
     method: { type: "string" },
     months: { type: "object" },
     fallback: { type: "boolean", description: "true if any asset used cached or snapshot data because the live source failed" },
@@ -75,7 +75,7 @@ export const openApiSpec = {
                   from: { type: "string" },
                   to: { type: "string" },
                   method: { type: "string", enum: ["average", "close"] },
-                  source: { type: "string", enum: ["live", "snapshot"] },
+                  source: { type: "string", enum: ["live", "snapshot", "tradingview"] },
                   targetReturn: { type: "number", example: 0.02 },
                   amount: { type: "number", example: 1000 },
                   includeSteps: { type: "boolean", description: "include every Gauss–Jordan row operation" },

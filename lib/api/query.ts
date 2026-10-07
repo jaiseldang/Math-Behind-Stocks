@@ -1,5 +1,5 @@
 import { parseAssets, type AssetId } from "@/lib/assets";
-import type { DataSource, Method } from "@/lib/data/types";
+import { DATA_SOURCES, type DataSource, type Method } from "@/lib/data/types";
 
 export class BadRequest extends Error {
   status = 400;
@@ -45,7 +45,7 @@ export function parseCommon(get: (k: string) => unknown): CommonQuery {
     from,
     to,
     method: oneOf(get("method"), ["average", "close"] as const, "average", "method"),
-    source: oneOf(get("source"), ["live", "snapshot"] as const, "live", "source"),
+    source: oneOf(get("source"), DATA_SOURCES, "live", "source"),
     solInterval: oneOf(get("solInterval"), ["weekly", "daily"] as const, "weekly", "solInterval"),
   };
 }

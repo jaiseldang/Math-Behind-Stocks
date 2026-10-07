@@ -9,6 +9,7 @@ import { ASSETS, type AssetId } from "@/lib/assets";
 import { tradingDays, weekdayCount } from "./calendar";
 import { alignMonths, isIncompleteMonth, resampleMonthly, type MonthlyPoint } from "./resample";
 import { SNAPSHOT, SNAPSHOT_META } from "./snapshot";
+import { tradingViewRawSeries } from "./tradingview";
 import type { DataSource, Method, MonthlyDataset, Provenance, RawSeries } from "./types";
 
 export interface DatasetQuery {
@@ -115,6 +116,21 @@ export function liveSeriesFromRaw(asset: AssetId, q: DatasetQuery, result: Cache
       warnings,
     },
   };
+}
+
+/** Bundled TradingView prices, resampled to months like live data (no network, never stale). */
+export function tradingViewSeries(asset: AssetId, q: DatasetQuery): SeriesResult {
+  const raw = tradingViewRawSeries(asset);
+  const result = liveSeriesFromRaw(asset, q, { data: raw, status: "miss", savedAt: raw.retrievedAt });
+  if (asset === "SOL" && q.solInterval === "daily") {
+    result.provenance.warnings.push("Solana: the bundled TradingView data has weekly closes only, so solInterval=daily was ignored.");
+  }
+  return { ...result, provenance: { ...result.provenance, cache: "none" } };
+}
+
+/** The series for a bundled source (IA snapshot or TradingView). Live data is loaded separately. */
+export function bundledSeries(asset: AssetId, q: DatasetQuery): SeriesResult {
+  return q.source === "tradingview" ? tradingViewSeries(asset, q) : snapshotSeries(asset);
 }
 
 /** Line the assets up on the months they all share and build the dataset. */

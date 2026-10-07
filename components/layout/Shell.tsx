@@ -103,6 +103,7 @@ function Controls() {
         <div className="seg" role="group" aria-labelledby="data-label">
           <button aria-pressed={source === "snapshot"} onClick={() => setSource("snapshot")}>IA snapshot</button>
           <button aria-pressed={source === "live"} onClick={() => setSource("live")}>Live</button>
+          <button aria-pressed={source === "tradingview"} onClick={() => setSource("tradingview")}>TradingView</button>
         </div>
       </div>
     </div>
@@ -112,7 +113,7 @@ function Controls() {
 function DataBanner() {
   const { source, warnings, fallback, error } = useData();
   if (error) return <div className="banner" role="status">{error}</div>;
-  if (source !== "live" || (!fallback && warnings.length === 0)) return null;
+  if (source === "snapshot" || (!fallback && warnings.length === 0)) return null;
   return (
     <div className="banner" role="status">
       <strong>{fallback ? "Some live data is unavailable, so fallback data is shown." : "Data notes"}</strong>

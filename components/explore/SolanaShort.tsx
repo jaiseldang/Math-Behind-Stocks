@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Figure } from "@/components/charts/Figure";
 import { Plot } from "@/components/charts/Plot";
 import { Check, Experiment, Finding, GuessChoice, Intuition, MathSteps } from "@/components/pattern/Stages";
+import { useData } from "@/components/providers";
 import { Slider } from "@/components/ui/Slider";
 import { ASSETS, DEFAULT_ASSETS } from "@/lib/assets";
 import { pct, texMatrixPlain, texNum } from "@/lib/format";
@@ -19,6 +20,7 @@ const OPTIONS = [
 
 export function SolanaShort() {
   const { stats, mvp, k } = useModel();
+  const { sourceNote } = useData();
   const rho0 = stats.correlation[0][2];
   const range = feasibleCorrelationRange(stats.correlation[0][1], stats.correlation[1][2]);
   const [rho, setRho] = useState(Number(rho0.toFixed(2)));
@@ -89,7 +91,7 @@ export function SolanaShort() {
           title="Solana's weight in the safest portfolio vs its correlation with the S&P 500"
           alt={`Solana's minimum-variance weight rises as the correlation falls. It crosses zero at ρ ≈ ${threshold?.toFixed(3) ?? "—"}.`}
           table={{ header: ["ρ(S&P, SOL)", "Solana weight"], rows: curve.map((c) => [Number(c.r.toFixed(2)), c.w]) }}
-          caption="Computed from the current dataset with only the S&P–Solana correlation changed. The slider only allows correlations that keep Σ positive definite."
+          caption={`Computed from the current dataset with only the S&P–Solana correlation changed. The slider only allows correlations that keep Σ positive definite. ${sourceNote}`}
         >
           <Plot xDomain={[curve[0]?.r ?? -1, curve.at(-1)?.r ?? 1]} yDomain={[Math.min(...curve.map((c) => c.w)) - 0.005, Math.max(...curve.map((c) => c.w)) + 0.005]} xFormat={(v) => v.toFixed(1)} yFormat={(v) => pct(v, 1)} xLabel="Correlation between S&P 500 and Solana" yLabel="Solana weight" zeroLineY>
             {({ x, y }) => (

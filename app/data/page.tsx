@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { Figure } from "@/components/charts/Figure";
+import { SourceComparison } from "@/components/data/SourceComparison";
 import { Plot } from "@/components/charts/Plot";
 import { Check, Experiment, Finding, GuessChoice, Intuition, MathSteps, PageHeader, Question } from "@/components/pattern/Stages";
 import { M } from "@/components/pattern/Tex";
@@ -24,21 +25,21 @@ export default function DataPage() {
   const [perMonth, setPerMonth] = useState(21);
   const sim = useMemo(() => averagingExperiment(perMonth, 4000), [perMonth]);
   const [calMonth, setCalMonth] = useState("2024-01");
-  const [live, setLive] = useState<{ average?: StatsBody; close?: StatsBody; error?: string } | null>(null);
+  const [live, setLive] = useState<{ source: "tradingview" | "live"; average?: StatsBody; close?: StatsBody; error?: string } | null>(null);
 
-  const loadLive = () => {
-    setLive({});
+  const loadLive = (source: "tradingview" | "live") => {
+    setLive({ source });
     Promise.all(
       (["average", "close"] as const).map((m) =>
-        fetch(`/api/stats?source=live&method=${m}`).then(async (r) => {
+        fetch(`/api/stats?source=${source}&method=${m}&from=2023-08`).then(async (r) => {
           const b = await r.json();
           if (!r.ok) throw new Error(b.error);
           return b as StatsBody;
         }),
       ),
     )
-      .then(([average, close]) => setLive({ average, close }))
-      .catch((e) => setLive({ error: e.message }));
+      .then(([average, close]) => setLive({ source, average, close }))
+      .catch((e) => setLive({ source, error: e.message }));
   };
 
   // Check: Solana's snapshot average × (number of Wednesdays) should be a whole number of cents.
@@ -110,10 +111,13 @@ export default function DataPage() {
 
       <Experiment title="Experiment B: the real data, both ways">
         <p>
-          This asks the API for live data twice, once with <code>method=average</code> and once with <code>method=close</code>. The IA snapshot only stores averages,
-          so this needs the live sources.
+          This asks the API for the same data twice, once with <code>method=average</code> and once with <code>method=close</code>. The IA snapshot only stores averages,
+          so this needs daily or weekly prices: the bundled TradingView data (works offline) or the live sources (the S&amp;P 500 needs a FRED key).
         </p>
-        <button className="btn primary" onClick={loadLive}>Fetch live statistics both ways</button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button className="btn primary" onClick={() => loadLive("tradingview")}>Compare using TradingView data</button>
+          <button className="btn" onClick={() => loadLive("live")}>Compare using live sources</button>
+        </div>
         {live && !live.average && !live.error && <p className="note">Loading…</p>}
         {live?.error && <div className="banner">Could not reach the API: {live.error}</div>}
         {live?.average && live.close && (
@@ -141,7 +145,12 @@ export default function DataPage() {
                 </tbody>
               </table>
             </div>
-            <p className="note">Gold only exists as monthly averages, so its two columns are identical by construction.</p>
+            <p className="note">
+              {live.source === "live"
+                ? "Live gold only exists as World Bank monthly averages, so its two columns are identical by construction."
+                : "TradingView has daily gold prices, so all three assets can be compared both ways."}{" "}
+              Statistics use {live.average.n} monthly returns from {live.source === "live" ? "the live sources" : "TradingView"}.
+            </p>
           </>
         )}
       </Experiment>
@@ -160,6 +169,10 @@ export default function DataPage() {
         <CalendarStrip month={calMonth} />
       </Experiment>
 
+      <Experiment title="Experiment D: same months, different provider">
+        <SourceComparison />
+      </Experiment>
+
       <Finding
         headline={<>Averaging smooths: monthly averages give about {pct(1 - Math.sqrt(2 / 3), 0)} lower standard deviations than month-end closes, and make consecutive returns correlated (ρ ≈ 0.25).</>}
         guessId="data-average-vs-close"
@@ -168,7 +181,8 @@ export default function DataPage() {
         <p>
           So two people <em>can</em> get different numbers for “March”. The IA uses monthly averages (the default here, and the only thing the snapshot stores).
           That means its risk figures are somewhat smaller than month-end figures would be. The optimal <em>weights</em> depend on the ratios between risks, so they move less.
-          This is noted on the <a href="/limitations">Limitations</a> page.
+          Changing provider (Experiment D) moves the minimum-risk weights by a few percentage points but the no-short band by less than 0.02 percentage points,
+          so the answer to the research question survives the data choices. This is noted on the <a href="/limitations">Limitations</a> page.
         </p>
       </Finding>
 
@@ -195,7 +209,7 @@ export default function DataPage() {
 
       <h2 style={{ marginTop: 32 }}>Sources in use right now</h2>
       <div className="note" style={{ marginBottom: 12 }}>
-        Currently showing: <strong>{data.source === "snapshot" ? "the IA snapshot" : "live data"}</strong> ({data.method === "average" ? "monthly averages" : "month-end closes"}).
+        Currently showing: <strong>{data.source === "snapshot" ? "the IA snapshot" : data.source === "tradingview" ? "TradingView (bundled)" : "live data"}</strong> ({data.method === "average" ? "monthly averages" : "month-end closes"}).
         Switch with the sidebar.{" "}
         <Segmented label="Resampling method" value={data.method} onChange={data.setMethod} options={[{ value: "average", label: "Monthly average" }, { value: "close", label: "Month-end close" }]} />
       </div>

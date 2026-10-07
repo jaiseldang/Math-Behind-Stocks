@@ -2,13 +2,13 @@
 /**
  * App-wide state:
  *  - Settings: classmate mode (words instead of symbols) and theme.
- *  - Data: which prices the pages use (IA snapshot by default, or live from the API).
+ *  - Data: which prices the pages use (IA snapshot by default, live from the API, or bundled TradingView).
  *  - Guesses: what the reader predicted, so each Finding can compare.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ASSETS, DEFAULT_ASSETS, type AssetId } from "@/lib/assets";
 import { SNAPSHOT } from "@/lib/data/snapshot";
-import type { Method, Provenance } from "@/lib/data/types";
+import type { DataSource, Method, Provenance } from "@/lib/data/types";
 
 type Theme = "system" | "light" | "dark";
 
@@ -37,9 +37,9 @@ const SettingsCtx = createContext<Settings | null>(null);
 
 // ---------------- Data ----------------
 export interface DataState {
-  source: "snapshot" | "live";
+  source: DataSource;
   method: Method;
-  setSource: (s: "snapshot" | "live") => void;
+  setSource: (s: DataSource) => void;
   setMethod: (m: Method) => void;
   assets: AssetId[];
   months: string[];
@@ -73,7 +73,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const [classmate, setClassmateState] = useState(false);
   const [theme, setThemeState] = useState<Theme>("system");
   const [guesses, setGuesses] = useState<Record<string, Guess>>({});
-  const [source, setSourceState] = useState<"snapshot" | "live">("snapshot");
+  const [source, setSourceState] = useState<DataSource>("snapshot");
   const [method, setMethodState] = useState<Method>("average");
   const [data, setData] = useState({
     months: snapshotMonths,
@@ -107,7 +107,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    // Live data uses the IA's start month so results stay comparable; it runs to the last complete month.
+    // Live and TradingView data use the IA's start month so results stay comparable; they run to the last complete month.
     fetch(`/api/prices?assets=SPX,XAU,SOL&from=${SNAPSHOT_MONTHS_FIRST}&source=${source}&method=${method}`)
       .then(async (r) => {
         const body = await r.json();
@@ -154,10 +154,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const dataState = useMemo<DataState>(() => {
     const first = data.months[0];
     const last = data.months.at(-1)!;
+    const kind = method === "close" ? "month-end closes" : "averages";
     const sourceNote =
-      source === "snapshot" || data.fallback
-        ? `Source: IA snapshot (FRED/Shiller S&P 500, World Bank gold, Kraken SOL/USD), monthly ${method === "close" ? "month-end" : "averages"}, ${first} to ${last}.`
-        : `Source: live FRED SP500, World Bank gold, Kraken SOL/USD; monthly ${method === "close" ? "month-end closes" : "averages"}, ${first} to ${last}.`;
+      source === "tradingview"
+        ? `Source: TradingView SP:SPX, TVC:GOLD, KRAKEN:SOLUSD (bundled, retrieved 2026-10-07); monthly ${kind}, ${first} to ${last}.`
+        : source === "snapshot" || data.fallback
+          ? `Source: IA snapshot (FRED/Shiller S&P 500, World Bank gold, Kraken SOL/USD), monthly averages, ${first} to ${last}.`
+          : `Source: live FRED SP500, World Bank gold, Kraken SOL/USD; monthly ${kind}, ${first} to ${last}.`;
     return {
       source,
       method,

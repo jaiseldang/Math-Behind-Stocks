@@ -14,7 +14,7 @@ import type { AssetId } from "@/lib/assets";
 import { openApiSpec } from "@/lib/api/openapi";
 import { parseQuery, route as sharedRoute, type ApiResult } from "@/lib/api/router";
 import {
-  assembleDataset, failedSeries, liveSeriesFromRaw, snapshotSeries, unavailableSeries,
+  assembleDataset, bundledSeries, failedSeries, liveSeriesFromRaw, unavailableSeries,
   type CacheResult, type DatasetQuery, type SeriesResult,
 } from "@/lib/data/assemble";
 import { fredRawSeries, fredUrl, FRED_NAME, type FredResponse } from "@/lib/data/providers/fred";
@@ -145,7 +145,7 @@ function liveSeries(asset: AssetId, q: DatasetQuery): SeriesResult {
 }
 
 export function loadMonthlyPrices(q: DatasetQuery): MonthlyDataset {
-  const series = q.source === "snapshot" ? q.assets.map((a) => snapshotSeries(a)) : q.assets.map((a) => liveSeries(a, q));
+  const series = q.source === "live" ? q.assets.map((a) => liveSeries(a, q)) : q.assets.map((a) => bundledSeries(a, q));
   return assembleDataset(q, series);
 }
 

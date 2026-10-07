@@ -6,7 +6,7 @@
  * assemble.ts so the Google Apps Script build can reuse it.
  */
 import type { AssetId } from "@/lib/assets";
-import { assembleDataset, failedSeries, liveSeriesFromRaw, snapshotSeries, unavailableSeries, type DatasetQuery, type SeriesResult } from "./assemble";
+import { assembleDataset, bundledSeries, failedSeries, liveSeriesFromRaw, unavailableSeries, type DatasetQuery, type SeriesResult } from "./assemble";
 import { cached } from "./cache";
 import { PROVIDERS } from "./providers";
 import type { MonthlyDataset } from "./types";
@@ -28,6 +28,6 @@ async function liveSeries(asset: AssetId, q: DatasetQuery): Promise<SeriesResult
 }
 
 export async function loadMonthlyPrices(q: DatasetQuery): Promise<MonthlyDataset> {
-  const series = q.source === "snapshot" ? q.assets.map((a) => snapshotSeries(a)) : await Promise.all(q.assets.map((a) => liveSeries(a, q)));
+  const series = q.source === "live" ? await Promise.all(q.assets.map((a) => liveSeries(a, q))) : q.assets.map((a) => bundledSeries(a, q));
   return assembleDataset(q, series);
 }

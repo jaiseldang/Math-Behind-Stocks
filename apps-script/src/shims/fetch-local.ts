@@ -1,16 +1,17 @@
 /**
  * For the static website (no server at all): fetch("/api/…") is answered in
  * the browser by the same router and maths as the real API, using the
- * bundled IA snapshot. Live sources can't be reached from a static page, so
- * a "live" request falls back to the snapshot with a clear warning.
+ * bundled data (IA snapshot or TradingView). Live sources can't be reached
+ * from a static page, so a "live" request falls back to the snapshot with a
+ * clear warning.
  */
 import { parseQuery, route } from "@/lib/api/router";
-import { assembleDataset, snapshotSeries, unavailableSeries, type DatasetQuery } from "@/lib/data/assemble";
+import { assembleDataset, bundledSeries, unavailableSeries, type DatasetQuery } from "@/lib/data/assemble";
 
 const WHY = "this hosted page can't reach FRED, the World Bank or Kraken; the full site can";
 
 function load(q: DatasetQuery) {
-  return assembleDataset(q, q.assets.map((a) => (q.source === "snapshot" ? snapshotSeries(a) : unavailableSeries(a, WHY))));
+  return assembleDataset(q, q.assets.map((a) => (q.source === "live" ? unavailableSeries(a, WHY) : bundledSeries(a, q))));
 }
 
 const realFetch = window.fetch.bind(window);

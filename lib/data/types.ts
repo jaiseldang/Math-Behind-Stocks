@@ -2,7 +2,8 @@ import type { AssetId } from "@/lib/assets";
 
 export type Method = "average" | "close";
 export type Frequency = "daily" | "weekly" | "monthly";
-export type DataSource = "live" | "snapshot";
+export type DataSource = "live" | "snapshot" | "tradingview";
+export const DATA_SOURCES: readonly DataSource[] = ["live", "snapshot", "tradingview"];
 
 /** One raw price observation, dated YYYY-MM-DD (UTC). */
 export interface Observation {
